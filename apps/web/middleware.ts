@@ -1,30 +1,58 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { updateSession } from '@/lib/supabase/middleware';
 
-// Auth middleware — will be fully implemented in Step 5
-// For now, allow all requests through
+/**
+ * Public paths — accessible without authentication.
+ * Everything else requires a valid Supabase session.
+ */
+const PUBLIC_PATHS = ['/', '/connect', '/about', '/docs', '/pricing'];
 
-const PUBLIC_PATHS = ['/', '/connect', '/onboarding', '/about', '/docs', '/pricing'];
-const AUTH_PATHS = ['/connect', '/onboarding'];
+/**
+ * Auth paths — if the user IS authenticated, redirect away from these.
+ */
+const AUTH_PATHS = ['/connect'];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public paths and API routes
+  // Skip static assets and API routes (API routes handle their own auth)
   if (
-    PUBLIC_PATHS.includes(pathname) ||
     pathname.startsWith('/api/') ||
-    pathname.startsWith('/_next/')
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/favicon')
   ) {
     return NextResponse.next();
   }
 
-  // TODO: Check for session cookie and redirect to /connect if missing
-  // Will be implemented in Step 5 with Supabase auth
+  // Refresh the Supabase session and get current user
+  const { user, supabaseResponse } = await updateSession(request);
 
-  return NextResponse.next();
+  const isPublic = PUBLIC_PATHS.includes(pathname);
+  const isAuthPath = AUTH_PATHS.includes(pathname);
+
+  // Authenticated user hitting /connect → redirect to dashboard
+  if (user && isAuthPath) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/overview';
+    return NextResponse.redirect(url);
+  }
+
+  // Unauthenticated user hitting a protected route → redirect to /connect
+  if (!user && !isPublic) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/connect';
+    // Preserve the intended destination so we can redirect back after login
+    url.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(url);
+  }
+
+  // Pass through with refreshed cookies
+  return supabaseResponse;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo.svg|og-image.png|fonts/).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|logo.svg|og-image.png|fonts/).*)',
+  ],
 };

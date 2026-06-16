@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   // TODO: Implement — Get risk analytics
   return NextResponse.json({ message: 'GET analytics/risk — not yet implemented' }, { status: 501 });
 }

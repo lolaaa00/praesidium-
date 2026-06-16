@@ -1,10 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { randomBytes } from 'crypto';
 
-// Generate a nonce for wallet sign-in
+/**
+ * GET /api/auth/nonce
+ * Generate a cryptographic nonce for wallet sign-in.
+ * The nonce is single-use and stored in a short-lived cookie.
+ */
+export async function GET() {
+  const nonce = randomBytes(32).toString('hex');
 
+  const response = NextResponse.json({ nonce });
 
+  // Store nonce in httpOnly cookie — expires in 5 minutes
+  response.cookies.set('auth_nonce', nonce, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 300,
+    path: '/',
+  });
 
-export async function GET(request: NextRequest) {
-  // TODO: Implement — Generate a nonce for wallet sign-in
-  return NextResponse.json({ message: 'GET auth/nonce — not yet implemented' }, { status: 501 });
+  return response;
 }

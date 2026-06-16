@@ -1,10 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
-// Destroy session
-
-
-
-export async function POST(request: NextRequest) {
-  // TODO: Implement — Destroy session
-  return NextResponse.json({ message: 'POST auth/logout — not yet implemented' }, { status: 501 });
+/**
+ * POST /api/auth/logout
+ * Sign out and clear session.
+ */
+export async function POST() {
+  try {
+    const supabase = await createServerSupabaseClient();
+    await supabase.auth.signOut();
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ success: true });
+  }
 }
