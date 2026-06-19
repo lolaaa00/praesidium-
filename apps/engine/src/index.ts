@@ -1,15 +1,17 @@
 import 'dotenv/config';
-import express from 'express';
+import express, { type Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
-import { env } from './config/env';
-import { logger } from './config/logger';
-import { requestIdMiddleware } from './middleware/request-id';
-import { errorHandler } from './middleware/error-handler';
-import { healthRouter } from './routes/health';
+import type { IncomingMessage } from 'http';
+import { env } from './config/env.js';
+import { logger } from './config/logger.js';
+import { requestIdMiddleware } from './middleware/request-id.js';
+import { errorHandler } from './middleware/error-handler.js';
+import { healthRouter } from './routes/health.js';
+import { validateRouter } from './routes/validate.js';
 
-const app = express();
+const app: Express = express();
 
 // ── Global Middleware ──
 app.use(helmet());
@@ -21,13 +23,12 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(requestIdMiddleware);
-app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/health' } }));
+const pinoMiddleware = pinoHttp.default || pinoHttp;
+app.use(pinoMiddleware({ logger, autoLogging: { ignore: (req: IncomingMessage) => req.url === '/health' } }));
 
 // ── Routes ──
 app.use(healthRouter);
-
-// Validation routes will be added in Step 14
-// app.use('/v1', validateRouter);
+app.use(validateRouter);
 
 // ── Error Handler ──
 app.use(errorHandler);

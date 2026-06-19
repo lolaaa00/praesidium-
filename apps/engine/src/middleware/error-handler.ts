@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { logger } from '../config/logger';
+import { logger } from '../config/logger.js';
 import { ZodError } from 'zod';
 
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction) {
