@@ -22,43 +22,43 @@ const VERDICT_CONFIG: Record<
 > = {
   approved: {
     icon: CheckCircle,
-    badge: 'bg-green-100 text-green-700',
+    badge: 'bg-pass/15 text-pass',
     label: 'Approved',
-    color: 'text-green-600',
+    color: 'text-pass',
   },
   rejected: {
     icon: XCircle,
-    badge: 'bg-red-100 text-red-700',
+    badge: 'bg-fail/15 text-fail',
     label: 'Rejected',
-    color: 'text-red-600',
+    color: 'text-fail',
   },
   escalated: {
     icon: AlertTriangle,
-    badge: 'bg-amber-100 text-amber-700',
+    badge: 'bg-warn/15 text-warn',
     label: 'Escalated',
-    color: 'text-amber-600',
+    color: 'text-warn',
   },
   conditional: {
     icon: Filter,
-    badge: 'bg-blue-100 text-blue-700',
+    badge: 'bg-cornflower/15 text-maxblue-2',
     label: 'Conditional',
-    color: 'text-blue-600',
+    color: 'text-maxblue-2',
   },
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-700',
-  processing: 'bg-blue-100 text-blue-700',
-  completed: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-700',
-  timeout: 'bg-amber-100 text-amber-700',
+  pending: 'bg-muted text-muted-foreground',
+  processing: 'bg-cornflower/15 text-maxblue-2',
+  completed: 'bg-pass/15 text-pass',
+  failed: 'bg-fail/15 text-fail',
+  timeout: 'bg-warn/15 text-warn',
 };
 
 const SEVERITY_BADGE: Record<string, string> = {
-  low: 'bg-blue-100 text-blue-700',
-  medium: 'bg-amber-100 text-amber-700',
-  high: 'bg-orange-100 text-orange-700',
-  critical: 'bg-red-100 text-red-700',
+  low: 'bg-cornflower/15 text-maxblue-2',
+  medium: 'bg-warn/15 text-warn',
+  high: 'bg-warn/15 text-warn',
+  critical: 'bg-fail/15 text-fail',
 };
 
 function ScoreRing({ score }: { score: number }) {
@@ -270,7 +270,7 @@ export default function ValidationDetailPage({
                 <ul className="space-y-1">
                   {(result.conditions as string[]).map((c, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm">
-                      <Filter className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                      <Filter className="mt-0.5 h-4 w-4 shrink-0 text-maxblue-2" />
                       {c}
                     </li>
                   ))}
@@ -295,7 +295,7 @@ export default function ValidationDetailPage({
           <div className="border-b px-6 py-4">
             <h2 className="font-semibold">
               Policy Violations{' '}
-              <span className="ml-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+              <span className="ml-1 rounded-full bg-fail/15 px-2 py-0.5 text-xs font-medium text-fail">
                 {violations.length}
               </span>
             </h2>
@@ -304,7 +304,7 @@ export default function ValidationDetailPage({
             {violations.map((viol) => (
               <div key={viol.id as string} className="px-6 py-4 space-y-1">
                 <div className="flex items-center gap-2">
-                  <XCircle className="h-4 w-4 text-red-600 shrink-0" />
+                  <XCircle className="h-4 w-4 text-fail shrink-0" />
                   <p className="font-medium text-sm">
                     {(viol.policy_rule as Record<string, unknown>)?.name as string ??
                       `Rule ${viol.rule_id as string}`}
@@ -326,24 +326,24 @@ export default function ValidationDetailPage({
 
       {/* Escalations */}
       {escalations.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 shadow-sm overflow-hidden">
-          <div className="border-b border-amber-200 px-6 py-4">
-            <h2 className="font-semibold text-amber-800">Escalation Required</h2>
+        <div className="rounded-xl border border-warn/30 bg-warn/10 shadow-sm overflow-hidden">
+          <div className="border-b border-warn/30 px-6 py-4">
+            <h2 className="font-semibold text-warn">Escalation Required</h2>
           </div>
           <div className="divide-y divide-amber-200">
             {escalations.map((esc) => (
               <div key={esc.id as string} className="px-6 py-4">
                 <div className="flex items-center gap-2 mb-1">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <p className="font-medium text-amber-900 text-sm capitalize">
+                  <AlertTriangle className="h-4 w-4 text-warn" />
+                  <p className="font-medium text-warn text-sm capitalize">
                     {(esc.escalation_type as string)?.replace('_', ' ')}
                   </p>
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 capitalize">
+                  <span className="rounded-full bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn capitalize">
                     {esc.status as string}
                   </span>
                 </div>
                 {esc.reason != null && (
-                  <p className="pl-6 text-sm text-amber-800">{esc.reason as string}</p>
+                  <p className="pl-6 text-sm text-warn">{esc.reason as string}</p>
                 )}
               </div>
             ))}

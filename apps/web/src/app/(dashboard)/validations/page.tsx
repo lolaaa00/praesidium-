@@ -6,18 +6,18 @@ import { CheckCircle, XCircle, AlertTriangle, Clock, Search, Filter } from 'luci
 import { useValidations } from '@/hooks/queries/use-validations';
 
 const VERDICT_CONFIG: Record<string, { icon: React.ElementType; badge: string }> = {
-  approved: { icon: CheckCircle, badge: 'bg-green-100 text-green-700' },
-  rejected: { icon: XCircle, badge: 'bg-red-100 text-red-700' },
-  escalated: { icon: AlertTriangle, badge: 'bg-amber-100 text-amber-700' },
-  conditional: { icon: Filter, badge: 'bg-blue-100 text-blue-700' },
+  approved: { icon: CheckCircle, badge: 'bg-pass/15 text-pass' },
+  rejected: { icon: XCircle, badge: 'bg-fail/15 text-fail' },
+  escalated: { icon: AlertTriangle, badge: 'bg-warn/15 text-warn' },
+  conditional: { icon: Filter, badge: 'bg-cornflower/15 text-maxblue-2' },
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-700',
-  processing: 'bg-blue-100 text-blue-700',
-  completed: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-700',
-  timeout: 'bg-amber-100 text-amber-700',
+  pending: 'bg-muted text-muted-foreground',
+  processing: 'bg-cornflower/15 text-maxblue-2',
+  completed: 'bg-pass/15 text-pass',
+  failed: 'bg-fail/15 text-fail',
+  timeout: 'bg-warn/15 text-warn',
 };
 
 export default function ValidationsPage() {
@@ -91,7 +91,7 @@ export default function ValidationsPage() {
                 >
                   <div className="flex items-start gap-4">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <VerdictIcon className={`h-5 w-5 ${verdict === 'approved' ? 'text-green-600' : verdict === 'rejected' ? 'text-red-600' : 'text-amber-600'}`} />
+                      <VerdictIcon className={`h-5 w-5 ${verdict === 'approved' ? 'text-pass' : verdict === 'rejected' ? 'text-fail' : 'text-warn'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">

@@ -11,17 +11,17 @@ const PERIOD_OPTIONS = [
 ];
 
 const SEVERITY_CONFIG: Record<string, { label: string; bar: string; text: string }> = {
-  critical: { label: 'Critical', bar: 'bg-red-500', text: 'text-red-700' },
-  high: { label: 'High', bar: 'bg-orange-500', text: 'text-orange-700' },
-  medium: { label: 'Medium', bar: 'bg-amber-500', text: 'text-amber-700' },
-  low: { label: 'Low', bar: 'bg-blue-500', text: 'text-blue-700' },
+  critical: { label: 'Critical', bar: 'bg-fail', text: 'text-fail' },
+  high: { label: 'High', bar: 'bg-warn', text: 'text-warn' },
+  medium: { label: 'Medium', bar: 'bg-warn', text: 'text-warn' },
+  low: { label: 'Low', bar: 'bg-cornflower', text: 'text-maxblue-2' },
 };
 
 const RISK_LEVEL_CONFIG: Record<string, { badge: string; icon: React.ElementType }> = {
-  low: { badge: 'bg-green-100 text-green-700', icon: ShieldCheck },
-  medium: { badge: 'bg-amber-100 text-amber-700', icon: AlertTriangle },
-  high: { badge: 'bg-orange-100 text-orange-700', icon: AlertTriangle },
-  critical: { badge: 'bg-red-100 text-red-700', icon: AlertTriangle },
+  low: { badge: 'bg-pass/15 text-pass', icon: ShieldCheck },
+  medium: { badge: 'bg-warn/15 text-warn', icon: AlertTriangle },
+  high: { badge: 'bg-warn/15 text-warn', icon: AlertTriangle },
+  critical: { badge: 'bg-fail/15 text-fail', icon: AlertTriangle },
 };
 
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -71,22 +71,22 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
               style={{ height: `${Math.max(heightPct, 2)}%` }}
               title={`${t.date}: ${total} — ${t.approved} approved, ${t.rejected} rejected, ${t.escalated} escalated`}
             >
-              <div className="bg-green-500" style={{ height: `${approvedPct}%` }} />
-              <div className="bg-amber-400" style={{ height: `${escalatedPct}%` }} />
-              <div className="bg-red-500" style={{ height: `${rejectedPct}%` }} />
+              <div className="bg-pass" style={{ height: `${approvedPct}%` }} />
+              <div className="bg-warn" style={{ height: `${escalatedPct}%` }} />
+              <div className="bg-fail" style={{ height: `${rejectedPct}%` }} />
             </div>
           );
         })}
       </div>
       <div className="flex items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-green-500 inline-block" /> Approved
+          <span className="h-2 w-2 rounded-full bg-pass inline-block" /> Approved
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-amber-400 inline-block" /> Escalated
+          <span className="h-2 w-2 rounded-full bg-warn inline-block" /> Escalated
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-red-500 inline-block" /> Rejected
+          <span className="h-2 w-2 rounded-full bg-fail inline-block" /> Rejected
         </span>
       </div>
     </div>
@@ -141,7 +141,7 @@ export default function RiskAnalyticsPage() {
   const severityMax = Math.max(...Object.values(severityCounts), 1);
   const riskCfg = RISK_LEVEL_CONFIG[riskLevel];
   const RiskIcon = riskCfg?.icon ?? AlertTriangle;
-  const riskBadge = riskCfg?.badge ?? 'bg-gray-100 text-gray-700';
+  const riskBadge = riskCfg?.badge ?? 'bg-muted text-muted-foreground';
 
   return (
     <div className="space-y-6">
@@ -182,28 +182,28 @@ export default function RiskAnalyticsPage() {
                 value: summary ? `${summary.approvalRate.toFixed(1)}%` : '—',
                 sub: `${summary?.approved ?? 0} of ${summary?.total ?? 0} validated`,
                 icon: ShieldCheck,
-                iconColor: 'text-green-600',
+                iconColor: 'text-pass',
               },
               {
                 label: 'Avg Compliance Score',
                 value: summary ? `${summary.avgComplianceScore.toFixed(0)}%` : '—',
                 sub: 'Across all validations',
                 icon: BarChart3,
-                iconColor: 'text-blue-600',
+                iconColor: 'text-maxblue-2',
               },
               {
                 label: 'Rejected',
                 value: String(summary?.rejected ?? '—'),
                 sub: 'Actions blocked',
                 icon: TrendingDown,
-                iconColor: 'text-red-600',
+                iconColor: 'text-fail',
               },
               {
                 label: 'Escalated',
                 value: String(summary?.escalated ?? '—'),
                 sub: 'Awaiting human review',
                 icon: TrendingUp,
-                iconColor: 'text-amber-600',
+                iconColor: 'text-warn',
               },
             ].map(({ label, value, sub, icon: Icon, iconColor }) => (
               <div key={label} className="rounded-xl border bg-card p-5 shadow-sm">
@@ -302,7 +302,7 @@ export default function RiskAnalyticsPage() {
                       <p className="flex-1 truncate text-sm" title={r.rule}>
                         {r.rule}
                       </p>
-                      <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                      <span className="shrink-0 rounded-full bg-fail/15 px-2 py-0.5 text-xs font-medium text-fail">
                         {r.count}×
                       </span>
                     </div>

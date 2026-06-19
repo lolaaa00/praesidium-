@@ -27,16 +27,16 @@ import {
 } from '@/hooks/queries/use-policies';
 
 const SEVERITY_BADGE: Record<string, string> = {
-  low: 'bg-blue-100 text-blue-700',
-  medium: 'bg-amber-100 text-amber-700',
-  high: 'bg-orange-100 text-orange-700',
-  critical: 'bg-red-100 text-red-700',
+  low: 'bg-cornflower/15 text-maxblue-2',
+  medium: 'bg-warn/15 text-warn',
+  high: 'bg-warn/15 text-warn',
+  critical: 'bg-fail/15 text-fail',
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  active: 'bg-green-100 text-green-700',
-  archived: 'bg-red-100 text-red-700',
+  draft: 'bg-muted text-muted-foreground',
+  active: 'bg-pass/15 text-pass',
+  archived: 'bg-fail/15 text-fail',
 };
 
 interface RuleFormState {
@@ -218,7 +218,7 @@ export default function PolicyDetailPage({
               <button
                 onClick={handleActivate}
                 disabled={updatePolicy.isPending}
-                className="flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 rounded-md bg-pass-2 px-4 py-2 text-sm font-medium text-white hover:bg-pass-2 disabled:opacity-50 transition-colors"
               >
                 <CheckCircle className="h-4 w-4" />
                 Activate
@@ -234,18 +234,18 @@ export default function PolicyDetailPage({
             {!confirmArchive ? (
               <button
                 onClick={() => setConfirmArchive(true)}
-                className="flex items-center gap-2 rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                className="flex items-center gap-2 rounded-md border border-fail/30 px-4 py-2 text-sm font-medium text-fail hover:bg-fail/10 transition-colors"
               >
                 <Archive className="h-4 w-4" />
                 Archive
               </button>
             ) : (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-red-600">Are you sure?</span>
+                <span className="text-sm text-fail">Are you sure?</span>
                 <button
                   onClick={handleArchive}
                   disabled={deletePolicy.isPending}
-                  className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                  className="rounded-md bg-fail px-3 py-1.5 text-sm font-medium text-white hover:bg-fail disabled:opacity-50"
                 >
                   Yes, archive
                 </button>
@@ -365,7 +365,7 @@ export default function PolicyDetailPage({
                   onClick={() => setRuleForm((f) => ({ ...f, enabled: !f.enabled }))}
                 >
                   {ruleForm.enabled ? (
-                    <ToggleRight className="h-6 w-6 text-green-600" />
+                    <ToggleRight className="h-6 w-6 text-pass" />
                   ) : (
                     <ToggleLeft className="h-6 w-6 text-muted-foreground" />
                   )}
@@ -450,7 +450,7 @@ export default function PolicyDetailPage({
                           className="rounded-md p-1.5 hover:bg-accent transition-colors"
                         >
                           {rule.enabled ? (
-                            <ToggleRight className="h-4 w-4 text-green-600" />
+                            <ToggleRight className="h-4 w-4 text-pass" />
                           ) : (
                             <ToggleLeft className="h-4 w-4 text-muted-foreground" />
                           )}
@@ -463,7 +463,7 @@ export default function PolicyDetailPage({
                         </button>
                         <button
                           onClick={() => handleDeleteRule(rule.id)}
-                          className="rounded-md p-1.5 hover:bg-red-50 text-red-600 transition-colors"
+                          className="rounded-md p-1.5 hover:bg-fail/10 text-fail transition-colors"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

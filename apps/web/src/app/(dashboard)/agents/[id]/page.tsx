@@ -25,16 +25,16 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 const STATUS_CONFIG: Record<string, { badge: string; label: string }> = {
-  active: { badge: 'bg-green-100 text-green-700', label: 'Active' },
-  suspended: { badge: 'bg-amber-100 text-amber-700', label: 'Suspended' },
-  revoked: { badge: 'bg-red-100 text-red-700', label: 'Revoked' },
+  active: { badge: 'bg-pass/15 text-pass', label: 'Active' },
+  suspended: { badge: 'bg-warn/15 text-warn', label: 'Suspended' },
+  revoked: { badge: 'bg-fail/15 text-fail', label: 'Revoked' },
 };
 
 const VERDICT_BADGE: Record<string, string> = {
-  approved: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
-  escalated: 'bg-amber-100 text-amber-700',
-  conditional: 'bg-blue-100 text-blue-700',
+  approved: 'bg-pass/15 text-pass',
+  rejected: 'bg-fail/15 text-fail',
+  escalated: 'bg-warn/15 text-warn',
+  conditional: 'bg-cornflower/15 text-maxblue-2',
 };
 
 export default function AgentDetailPage({
@@ -107,7 +107,7 @@ export default function AgentDetailPage({
     );
   }
 
-  const statusConfig = STATUS_CONFIG[agent.status] ?? { badge: 'bg-gray-100 text-gray-700', label: agent.status };
+  const statusConfig = STATUS_CONFIG[agent.status] ?? { badge: 'bg-muted text-muted-foreground', label: agent.status };
   const isRevoked = agent.status === 'revoked';
   const isSuspended = agent.status === 'suspended';
 
@@ -148,8 +148,8 @@ export default function AgentDetailPage({
               disabled={updateAgent.isPending}
               className={`flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
                 isSuspended
-                  ? 'border-green-200 text-green-700 hover:bg-green-50'
-                  : 'border-amber-200 text-amber-700 hover:bg-amber-50'
+                  ? 'border-pass/30 text-pass hover:bg-pass/10'
+                  : 'border-warn/30 text-warn hover:bg-warn/10'
               }`}
             >
               {isSuspended ? (
@@ -167,18 +167,18 @@ export default function AgentDetailPage({
             {!confirmRevoke ? (
               <button
                 onClick={() => setConfirmRevoke(true)}
-                className="flex items-center gap-2 rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                className="flex items-center gap-2 rounded-md border border-fail/30 px-4 py-2 text-sm font-medium text-fail hover:bg-fail/10 transition-colors"
               >
                 <Ban className="h-4 w-4" />
                 Revoke
               </button>
             ) : (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-red-600">Permanently revoke?</span>
+                <span className="text-sm text-fail">Permanently revoke?</span>
                 <button
                   onClick={handleRevoke}
                   disabled={revokeAgent.isPending}
-                  className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                  className="rounded-md bg-fail px-3 py-1.5 text-sm font-medium text-white hover:bg-fail disabled:opacity-50"
                 >
                   Yes, revoke
                 </button>
@@ -196,27 +196,27 @@ export default function AgentDetailPage({
 
       {/* New API Key Banner */}
       {newApiKey && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div className="rounded-xl border border-warn/30 bg-warn/10 p-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-amber-800">
+              <p className="font-medium text-warn">
                 New API key generated — copy it now
               </p>
-              <p className="text-sm text-amber-700">
+              <p className="text-sm text-warn">
                 This key will not be shown again after you leave this page.
               </p>
               <div className="mt-3 flex items-center gap-2">
-                <code className="flex-1 rounded-md bg-amber-100 px-3 py-2 font-mono text-sm text-amber-900 break-all">
+                <code className="flex-1 rounded-md bg-warn/15 px-3 py-2 font-mono text-sm text-warn break-all">
                   {newApiKey}
                 </code>
                 <button
                   onClick={copyKey}
-                  className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors flex items-center gap-1.5"
+                  className="shrink-0 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm font-medium text-warn hover:bg-warn/15 transition-colors flex items-center gap-1.5"
                 >
                   {copied ? (
                     <>
-                      <Check className="h-4 w-4 text-green-600" />
+                      <Check className="h-4 w-4 text-pass" />
                       Copied
                     </>
                   ) : (
@@ -312,9 +312,9 @@ export default function AgentDetailPage({
                   <td className="px-6 py-3 font-mono text-sm">{perm.action_type}</td>
                   <td className="px-6 py-3">
                     {perm.allowed ? (
-                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <CheckCircle className="h-4 w-4 text-pass" />
                     ) : (
-                      <Ban className="h-4 w-4 text-red-600" />
+                      <Ban className="h-4 w-4 text-fail" />
                     )}
                   </td>
                   <td className="px-6 py-3 font-mono text-xs text-muted-foreground">

@@ -24,10 +24,10 @@ const ESCALATION_TYPE_LABEL: Record<string, string> = {
 };
 
 const VERDICT_BADGE: Record<string, string> = {
-  approved: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
-  escalated: 'bg-amber-100 text-amber-700',
-  conditional: 'bg-blue-100 text-blue-700',
+  approved: 'bg-pass/15 text-pass',
+  rejected: 'bg-fail/15 text-fail',
+  escalated: 'bg-warn/15 text-warn',
+  conditional: 'bg-cornflower/15 text-maxblue-2',
 };
 
 export default function ConsensusPage() {
@@ -66,7 +66,7 @@ export default function ConsensusPage() {
         <div className="flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm shadow-sm">
           <div
             className={`h-2 w-2 rounded-full ${
-              contractStatus?.status === 'healthy' ? 'bg-green-500' : 'bg-amber-400'
+              contractStatus?.status === 'healthy' ? 'bg-pass' : 'bg-warn'
             }`}
           />
           <span className="font-medium">
@@ -85,33 +85,33 @@ export default function ConsensusPage() {
             label: 'Escalated',
             value: String(escalatedData?.pagination?.total ?? '—'),
             icon: AlertTriangle,
-            color: 'text-amber-600',
-            bg: 'bg-amber-50',
+            color: 'text-warn',
+            bg: 'bg-warn/10',
           },
           {
             label: 'Completed',
             value: String(recentData?.pagination?.total ?? '—'),
             icon: CheckCircle,
-            color: 'text-green-600',
-            bg: 'bg-green-50',
+            color: 'text-pass',
+            bg: 'bg-pass/10',
           },
           {
             label: 'Validators',
             value: contractStatus?.validators != null ? String(contractStatus.validators) : '—',
             icon: Users,
-            color: 'text-blue-600',
-            bg: 'bg-blue-50',
+            color: 'text-maxblue-2',
+            bg: 'bg-maxblue/10',
           },
           {
             label: 'Avg Latency',
             value: contractStatus?.avgLatencyMs != null ? `${contractStatus.avgLatencyMs}ms` : '—',
             icon: Zap,
-            color: 'text-purple-600',
-            bg: 'bg-purple-50',
+            color: 'text-cornflower-2',
+            bg: 'bg-cornflower/10',
           },
         ].map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className={`flex items-center gap-3 rounded-xl border p-4 ${bg}`}>
-            <div className={`rounded-lg bg-white p-2 shadow-sm ${color}`}>
+          <div key={label} className={`flex items-center gap-3 rounded-xl border border-border p-4 ${bg}`}>
+            <div className={`rounded-lg bg-card p-2 shadow-sm ${color}`}>
               <Icon className="h-5 w-5" />
             </div>
             <div>
@@ -153,7 +153,7 @@ export default function ConsensusPage() {
         <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-16">
           {tab === 'escalated' ? (
             <>
-              <CheckCircle className="h-12 w-12 text-green-500/50" />
+              <CheckCircle className="h-12 w-12 text-pass/50" />
               <p className="mt-4 text-lg font-medium">No pending escalations</p>
               <p className="text-sm text-muted-foreground">All validations resolved by consensus.</p>
             </>
@@ -190,18 +190,18 @@ export default function ConsensusPage() {
                   <div
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
                       verdict === 'escalated'
-                        ? 'bg-amber-100'
+                        ? 'bg-warn/15'
                         : verdict === 'approved'
-                        ? 'bg-green-100'
-                        : 'bg-red-100'
+                        ? 'bg-pass/15'
+                        : 'bg-fail/15'
                     }`}
                   >
                     {verdict === 'escalated' ? (
-                      <AlertTriangle className="h-5 w-5 text-amber-600" />
+                      <AlertTriangle className="h-5 w-5 text-warn" />
                     ) : verdict === 'approved' ? (
-                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <CheckCircle className="h-5 w-5 text-pass" />
                     ) : (
-                      <Shield className="h-5 w-5 text-red-600" />
+                      <Shield className="h-5 w-5 text-fail" />
                     )}
                   </div>
 
@@ -242,7 +242,7 @@ export default function ConsensusPage() {
                         {escalations.map((esc) => (
                           <span
                             key={esc.id as string}
-                            className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+                            className="rounded-md bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn"
                           >
                             {ESCALATION_TYPE_LABEL[esc.escalation_type as string] ??
                               (esc.escalation_type as string)}

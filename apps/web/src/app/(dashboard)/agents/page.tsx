@@ -6,9 +6,9 @@ import { Plus, Bot, Search, Key, MoreHorizontal } from 'lucide-react';
 import { useAgents, useRevokeAgent } from '@/hooks/queries/use-agents';
 
 const STATUS_BADGE: Record<string, string> = {
-  active: 'bg-green-100 text-green-700',
-  suspended: 'bg-amber-100 text-amber-700',
-  revoked: 'bg-red-100 text-red-700',
+  active: 'bg-pass/15 text-pass',
+  suspended: 'bg-warn/15 text-warn',
+  revoked: 'bg-fail/15 text-fail',
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -142,7 +142,7 @@ export default function AgentsPage() {
                       {agent.status === 'active' && (
                         <button
                           onClick={() => revokeAgent.mutate(agent.id)}
-                          className="rounded-md px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
+                          className="rounded-md px-2 py-1 text-xs font-medium text-fail hover:bg-fail/15 transition-colors"
                         >
                           Revoke
                         </button>

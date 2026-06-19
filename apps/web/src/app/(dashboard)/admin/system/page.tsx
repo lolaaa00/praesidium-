@@ -7,9 +7,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { contractKeys } from '@/hooks/queries/use-contract';
 
 const STATUS_CONFIG: Record<string, { icon: React.ElementType; badge: string; label: string }> = {
-  healthy: { icon: CheckCircle, badge: 'bg-green-100 text-green-700', label: 'Healthy' },
-  degraded: { icon: AlertTriangle, badge: 'bg-amber-100 text-amber-700', label: 'Degraded' },
-  offline: { icon: XCircle, badge: 'bg-red-100 text-red-700', label: 'Offline' },
+  healthy: { icon: CheckCircle, badge: 'bg-pass/15 text-pass', label: 'Healthy' },
+  degraded: { icon: AlertTriangle, badge: 'bg-warn/15 text-warn', label: 'Degraded' },
+  offline: { icon: XCircle, badge: 'bg-fail/15 text-fail', label: 'Offline' },
 };
 
 const SYSTEM_CHECKS = [
@@ -23,7 +23,7 @@ export default function SystemHealthPage() {
   const qc = useQueryClient();
 
   const status = data?.status ?? 'offline';
-  const cfg = STATUS_CONFIG[status] ?? { icon: XCircle, badge: 'bg-red-100 text-red-700', label: 'Offline' };
+  const cfg = STATUS_CONFIG[status] ?? { icon: XCircle, badge: 'bg-fail/15 text-fail', label: 'Offline' };
   const StatusIcon = cfg.icon;
 
   function handleRefresh() {
@@ -55,14 +55,14 @@ export default function SystemHealthPage() {
 
       {/* Overall status banner */}
       <div className={`flex items-center gap-4 rounded-xl border p-5 ${
-        status === 'healthy' ? 'border-green-200 bg-green-50' :
-        status === 'degraded' ? 'border-amber-200 bg-amber-50' :
-        'border-red-200 bg-red-50'
+        status === 'healthy' ? 'border-pass/30 bg-pass/10' :
+        status === 'degraded' ? 'border-warn/30 bg-warn/10' :
+        'border-fail/30 bg-fail/10'
       }`}>
         <StatusIcon className={`h-8 w-8 ${
-          status === 'healthy' ? 'text-green-600' :
-          status === 'degraded' ? 'text-amber-600' :
-          'text-red-600'
+          status === 'healthy' ? 'text-pass' :
+          status === 'degraded' ? 'text-warn' :
+          'text-fail'
         }`} />
         <div>
           <p className="font-semibold text-lg capitalize">{status}</p>
@@ -97,12 +97,12 @@ export default function SystemHealthPage() {
 
             return (
               <div key={key} className="flex items-center gap-4 px-6 py-4">
-                <div className={`h-2.5 w-2.5 rounded-full ${online ? 'bg-green-500' : 'bg-red-500'}`} />
+                <div className={`h-2.5 w-2.5 rounded-full ${online ? 'bg-pass' : 'bg-fail'}`} />
                 <div className="flex-1">
                   <p className="font-medium text-sm">{label}</p>
                   <p className="text-xs text-muted-foreground">{description}</p>
                 </div>
-                <span className={`text-xs font-medium ${online ? 'text-green-700' : 'text-red-700'}`}>
+                <span className={`text-xs font-medium ${online ? 'text-pass' : 'text-fail'}`}>
                   {online ? 'Online' : 'Offline'}
                 </span>
               </div>

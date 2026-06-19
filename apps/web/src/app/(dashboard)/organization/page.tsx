@@ -16,9 +16,9 @@ import { useOrgMembers, useInviteMember, useRemoveMember, useUpdateOrg } from '@
 import { useOrgStore } from '@/stores/org-store';
 
 const ROLE_CONFIG: Record<string, { icon: React.ElementType; badge: string; label: string }> = {
-  owner: { icon: Crown, badge: 'bg-amber-100 text-amber-700', label: 'Owner' },
-  admin: { icon: Shield, badge: 'bg-blue-100 text-blue-700', label: 'Admin' },
-  member: { icon: User, badge: 'bg-gray-100 text-gray-700', label: 'Member' },
+  owner: { icon: Crown, badge: 'bg-warn/15 text-warn', label: 'Owner' },
+  admin: { icon: Shield, badge: 'bg-cornflower/15 text-maxblue-2', label: 'Admin' },
+  member: { icon: User, badge: 'bg-muted text-muted-foreground', label: 'Member' },
 };
 
 export default function OrganizationPage() {
@@ -122,7 +122,7 @@ export default function OrganizationPage() {
                 className="shrink-0 rounded-md border px-3 py-2 text-sm hover:bg-accent transition-colors"
               >
                 {copiedSlug ? (
-                  <Check className="h-4 w-4 text-green-600" />
+                  <Check className="h-4 w-4 text-pass" />
                 ) : (
                   <Copy className="h-4 w-4" />
                 )}
@@ -176,7 +176,7 @@ export default function OrganizationPage() {
             {members.map((m) => {
               const user = m.user_profile as Record<string, unknown> | null;
               const role = (m.role as string) ?? 'member';
-              const roleCfg = ROLE_CONFIG[role] ?? { icon: User, badge: 'bg-gray-100 text-gray-700', label: role };
+              const roleCfg = ROLE_CONFIG[role] ?? { icon: User, badge: 'bg-muted text-muted-foreground', label: role };
               const RoleIcon = roleCfg.icon;
               const displayName = (user?.display_name as string) ?? 'Unknown';
               const walletAddress = (user?.wallet_address as string) ?? '';
@@ -218,11 +218,11 @@ export default function OrganizationPage() {
                     <div className="flex items-center gap-2">
                       {isRemoving ? (
                         <>
-                          <span className="text-xs text-red-600">Remove?</span>
+                          <span className="text-xs text-fail">Remove?</span>
                           <button
                             onClick={() => handleRemove(m.user_id as string)}
                             disabled={removeMember.isPending}
-                            className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                            className="rounded-md bg-fail px-2.5 py-1 text-xs font-medium text-white hover:bg-fail disabled:opacity-50"
                           >
                             Yes
                           </button>
@@ -236,7 +236,7 @@ export default function OrganizationPage() {
                       ) : (
                         <button
                           onClick={() => setConfirmRemove(m.user_id as string)}
-                          className="rounded-md p-1.5 text-red-600 hover:bg-red-50 transition-colors"
+                          className="rounded-md p-1.5 text-fail hover:bg-fail/10 transition-colors"
                           title="Remove member"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -298,10 +298,10 @@ export default function OrganizationPage() {
         </div>
 
         {inviteError && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{inviteError}</p>
+          <p className="rounded-md bg-fail/10 px-3 py-2 text-sm text-fail">{inviteError}</p>
         )}
         {inviteSuccess && (
-          <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{inviteSuccess}</p>
+          <p className="rounded-md bg-pass/10 px-3 py-2 text-sm text-pass">{inviteSuccess}</p>
         )}
       </div>
     </div>

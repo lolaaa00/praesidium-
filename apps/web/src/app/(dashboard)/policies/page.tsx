@@ -6,9 +6,9 @@ import { Plus, Shield, MoreHorizontal, Search } from 'lucide-react';
 import { usePolicies, useDeletePolicy, useUpdatePolicy } from '@/hooks/queries/use-policies';
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  active: 'bg-green-100 text-green-700',
-  archived: 'bg-red-100 text-red-700',
+  draft: 'bg-muted text-muted-foreground',
+  active: 'bg-pass/15 text-pass',
+  archived: 'bg-fail/15 text-fail',
 };
 
 export default function PoliciesPage() {
@@ -137,7 +137,7 @@ export default function PoliciesPage() {
                         {policy.status === 'draft' && (
                           <button
                             onClick={() => updatePolicy.mutate({ id: policy.id, status: 'active' })}
-                            className="rounded-md px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors"
+                            className="rounded-md px-2 py-1 text-xs font-medium text-pass hover:bg-pass/15 transition-colors"
                           >
                             Activate
                           </button>
@@ -145,7 +145,7 @@ export default function PoliciesPage() {
                         {policy.status !== 'archived' && (
                           <button
                             onClick={() => deletePolicy.mutate(policy.id)}
-                            className="rounded-md px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
+                            className="rounded-md px-2 py-1 text-xs font-medium text-fail hover:bg-fail/15 transition-colors"
                           >
                             Archive
                           </button>

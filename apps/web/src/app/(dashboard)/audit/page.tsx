@@ -5,21 +5,21 @@ import { ScrollText, User, Clock } from 'lucide-react';
 import { useAuditLogs } from '@/hooks/queries/use-audit';
 
 const ACTION_COLORS: Record<string, string> = {
-  policy_created: 'text-blue-600',
-  policy_updated: 'text-blue-600',
-  policy_activated: 'text-green-600',
-  policy_archived: 'text-red-600',
-  agent_registered: 'text-purple-600',
-  agent_suspended: 'text-amber-600',
-  agent_revoked: 'text-red-600',
-  validation_completed: 'text-green-600',
-  validation_failed: 'text-red-600',
-  escalation_created: 'text-amber-600',
-  member_invited: 'text-blue-600',
-  member_removed: 'text-red-600',
-  org_created: 'text-green-600',
-  user_login: 'text-gray-600',
-  user_logout: 'text-gray-600',
+  policy_created: 'text-maxblue-2',
+  policy_updated: 'text-maxblue-2',
+  policy_activated: 'text-pass',
+  policy_archived: 'text-fail',
+  agent_registered: 'text-cornflower-2',
+  agent_suspended: 'text-warn',
+  agent_revoked: 'text-fail',
+  validation_completed: 'text-pass',
+  validation_failed: 'text-fail',
+  escalation_created: 'text-warn',
+  member_invited: 'text-maxblue-2',
+  member_removed: 'text-fail',
+  org_created: 'text-pass',
+  user_login: 'text-muted-foreground',
+  user_logout: 'text-muted-foreground',
 };
 
 function formatAction(action: string): string {
@@ -94,7 +94,7 @@ export default function AuditTrailPage() {
               >
                 {/* Timeline dot */}
                 <div className="flex flex-col items-center mt-1">
-                  <div className={`h-2 w-2 rounded-full ${ACTION_COLORS[action] ? 'bg-current' : 'bg-gray-400'} ${ACTION_COLORS[action] || 'text-gray-400'}`} />
+                  <div className={`h-2 w-2 rounded-full ${ACTION_COLORS[action] ? 'bg-current' : 'bg-muted-foreground/40'} ${ACTION_COLORS[action] || 'text-muted-foreground'}`} />
                   {i < logs.length - 1 && <div className="w-px flex-1 bg-border mt-1" />}
                 </div>
 

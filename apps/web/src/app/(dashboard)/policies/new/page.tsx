@@ -55,7 +55,7 @@ export default function NewPolicyPage() {
           <div className="space-y-4">
             <div>
               <label className="mb-1 block text-sm font-medium">
-                Policy Name <span className="text-red-500">*</span>
+                Policy Name <span className="text-fail">*</span>
               </label>
               <input
                 type="text"
@@ -83,7 +83,7 @@ export default function NewPolicyPage() {
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-md bg-fail/10 border border-fail/30 px-4 py-3 text-sm text-fail">
               {error}
             </div>
           )}

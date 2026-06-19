@@ -123,25 +123,25 @@ export default function SettingsPage() {
       </div>
 
       {/* Danger zone */}
-      <div className="rounded-xl border border-red-200 bg-card p-6 shadow-sm space-y-4">
-        <h2 className="font-semibold text-red-700">Session</h2>
+      <div className="rounded-xl border border-fail/30 bg-card p-6 shadow-sm space-y-4">
+        <h2 className="font-semibold text-fail">Session</h2>
         <p className="text-sm text-muted-foreground">
           Logging out will disconnect your wallet and end your Praesidium session.
         </p>
         {!confirmLogout ? (
           <button
             onClick={() => setConfirmLogout(true)}
-            className="flex items-center gap-2 rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+            className="flex items-center gap-2 rounded-md border border-fail/30 px-4 py-2 text-sm font-medium text-fail hover:bg-fail/10 transition-colors"
           >
             <LogOut className="h-4 w-4" />
             Sign Out
           </button>
         ) : (
           <div className="flex items-center gap-3">
-            <span className="text-sm text-red-600">Sign out of Praesidium?</span>
+            <span className="text-sm text-fail">Sign out of Praesidium?</span>
             <button
               onClick={handleLogout}
-              className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+              className="rounded-md bg-fail px-3 py-1.5 text-sm font-medium text-white hover:bg-fail"
             >
               Yes, sign out
             </button>

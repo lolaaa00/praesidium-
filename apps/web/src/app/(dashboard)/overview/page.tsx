@@ -118,15 +118,15 @@ export default function OverviewPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Approved</span>
-                <span className="text-sm font-medium text-green-600">{summary.approved}</span>
+                <span className="text-sm font-medium text-pass">{summary.approved}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Rejected</span>
-                <span className="text-sm font-medium text-red-600">{summary.rejected}</span>
+                <span className="text-sm font-medium text-fail">{summary.rejected}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Escalated</span>
-                <span className="text-sm font-medium text-amber-600">{summary.escalated}</span>
+                <span className="text-sm font-medium text-warn">{summary.escalated}</span>
               </div>
               <div className="border-t pt-3 flex items-center justify-between">
                 <span className="text-sm font-medium">Avg Compliance Score</span>
@@ -156,9 +156,9 @@ export default function OverviewPage() {
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
                     {v.status === 'completed' ? (
-                      <Activity className="h-4 w-4 text-green-600" />
+                      <Activity className="h-4 w-4 text-pass" />
                     ) : (
-                      <Clock className="h-4 w-4 text-amber-600" />
+                      <Clock className="h-4 w-4 text-warn" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -171,10 +171,10 @@ export default function OverviewPage() {
                   </div>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                     v.status === 'completed'
-                      ? 'bg-green-100 text-green-700'
+                      ? 'bg-pass/15 text-pass'
                       : v.status === 'failed'
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-amber-100 text-amber-700'
+                        ? 'bg-fail/15 text-fail'
+                        : 'bg-warn/15 text-warn'
                   }`}>
                     {v.status as string}
                   </span>
@@ -203,7 +203,7 @@ export default function OverviewPage() {
                 className="flex items-center justify-between rounded-lg border p-3"
               >
                 <span className="text-sm truncate mr-2">{rule.rule}</span>
-                <span className="text-sm font-bold text-red-600 shrink-0">{rule.count}</span>
+                <span className="text-sm font-bold text-fail shrink-0">{rule.count}</span>
               </div>
             ))}
           </div>

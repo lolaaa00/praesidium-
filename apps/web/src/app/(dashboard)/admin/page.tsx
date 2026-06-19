@@ -37,19 +37,19 @@ export default function AdminPage() {
           {
             label: 'Contract',
             value: contractStatus?.status ?? 'unknown',
-            dot: isHealthy ? 'bg-green-500' : 'bg-amber-400',
+            dot: isHealthy ? 'bg-pass' : 'bg-warn',
           },
           {
             label: 'Network',
             value: contractStatus?.network ?? process.env.NEXT_PUBLIC_GENLAYER_NETWORK ?? 'studionet',
-            dot: 'bg-blue-500',
+            dot: 'bg-cornflower',
           },
           {
             label: 'Contract Address',
             value: contractStatus?.contractAddress
               ? `${contractStatus.contractAddress.slice(0, 8)}…${contractStatus.contractAddress.slice(-6)}`
               : 'Not deployed',
-            dot: contractStatus?.contractAddress ? 'bg-green-500' : 'bg-gray-400',
+            dot: contractStatus?.contractAddress ? 'bg-pass' : 'bg-muted-foreground/40',
           },
         ].map(({ label, value, dot }) => (
           <div key={label} className="rounded-xl border bg-card p-4 shadow-sm">
@@ -82,12 +82,12 @@ export default function AdminPage() {
         ))}
       </div>
 
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <div className="rounded-xl border border-warn/30 bg-warn/10 p-4">
         <div className="flex items-start gap-3">
-          <Shield className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+          <Shield className="h-5 w-5 shrink-0 text-warn mt-0.5" />
           <div>
-            <p className="font-medium text-amber-800">Admin access only</p>
-            <p className="text-sm text-amber-700 mt-0.5">
+            <p className="font-medium text-warn">Admin access only</p>
+            <p className="text-sm text-warn mt-0.5">
               This section is restricted to organization owners and admins. Actions taken here
               affect all members and agents in the system.
             </p>

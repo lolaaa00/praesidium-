@@ -65,25 +65,25 @@ export default function RegisterAgentPage() {
         </div>
 
         <div className="max-w-2xl space-y-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-6">
+          <div className="rounded-xl border border-warn/30 bg-warn/10 p-6">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-amber-800">Copy this API key — shown only once</p>
-                <p className="mt-0.5 text-sm text-amber-700">
+                <p className="font-semibold text-warn">Copy this API key — shown only once</p>
+                <p className="mt-0.5 text-sm text-warn">
                   This key will never be shown again. Store it securely in your agent&apos;s environment variables.
                 </p>
                 <div className="mt-4 flex items-center gap-2">
-                  <code className="flex-1 rounded-md bg-amber-100 px-3 py-2.5 font-mono text-sm text-amber-900 break-all">
+                  <code className="flex-1 rounded-md bg-warn/15 px-3 py-2.5 font-mono text-sm text-warn break-all">
                     {newApiKey}
                   </code>
                   <button
                     onClick={copyKey}
-                    className="shrink-0 flex items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors"
+                    className="shrink-0 flex items-center gap-1.5 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm font-medium text-warn hover:bg-warn/15 transition-colors"
                   >
                     {copied ? (
                       <>
-                        <Check className="h-4 w-4 text-green-600" />
+                        <Check className="h-4 w-4 text-pass" />
                         Copied
                       </>
                     ) : (
@@ -162,7 +162,7 @@ Content-Type: application/json
           <div className="space-y-4">
             <div>
               <label className="mb-1 block text-sm font-medium">
-                Agent Name <span className="text-red-500">*</span>
+                Agent Name <span className="text-fail">*</span>
               </label>
               <input
                 type="text"
@@ -216,7 +216,7 @@ Content-Type: application/json
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-md bg-fail/10 border border-fail/30 px-4 py-3 text-sm text-fail">
               {error}
             </div>
           )}
