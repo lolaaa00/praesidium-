@@ -3,67 +3,41 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * Praesidium "Open Sky Intelligence" palette, expressed as HSL so it
+   * plugs into the existing hsl(var(--x)) Tailwind tokens. The app ships
+   * with one (dark) theme — there is no light/dark toggle.
+   */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
+    --background: 218 77% 15%;
+    --foreground: 54 48% 88%;
+    --card: 215 45% 20%;
+    --card-foreground: 54 48% 88%;
+    --popover: 215 45% 18%;
+    --popover-foreground: 54 48% 88%;
+    --primary: 205 79% 43%;
+    --primary-foreground: 54 48% 95%;
+    --secondary: 215 40% 22%;
+    --secondary-foreground: 54 48% 88%;
+    --muted: 215 35% 20%;
+    --muted-foreground: 54 20% 70%;
+    --accent: 195 50% 28%;
+    --accent-foreground: 54 48% 88%;
+    --destructive: 0 84% 63%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --border: 195 30% 25%;
+    --input: 195 30% 25%;
+    --ring: 205 79% 43%;
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 220 70% 10%;
+    --sidebar-foreground: 54 30% 80%;
+    --sidebar-primary: 205 79% 43%;
+    --sidebar-primary-foreground: 54 48% 95%;
+    --sidebar-accent: 205 50% 20%;
+    --sidebar-accent-foreground: 195 53% 65%;
+    --sidebar-border: 195 30% 20%;
+    --sidebar-ring: 205 79% 43%;
   }
 }
 
@@ -74,5 +48,27 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .text-gradient-sky {
+    background-image: linear-gradient(110deg, #efecd1 0%, #72c4de 28%, #1a96e8 55%, #51abc9 78%, #efecd1 100%);
+    background-size: 260% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .text-gradient-blue {
+    background-image: linear-gradient(110deg, #72c4de 0%, #1a96e8 55%, #51abc9 100%);
+    background-size: 220% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .bg-mesh-sky {
+    background: radial-gradient(circle at 15% 0%, rgba(23, 124, 196, 0.35) 0%, transparent 55%),
+      radial-gradient(circle at 85% 90%, rgba(81, 171, 201, 0.25) 0%, transparent 55%),
+      #091f45;
   }
 }
