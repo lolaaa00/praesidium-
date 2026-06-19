@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ScrollText, Search, User, Clock } from 'lucide-react';
+import { ScrollText, User, Clock } from 'lucide-react';
 import { useAuditLogs } from '@/hooks/queries/use-audit';
 
 const ACTION_COLORS: Record<string, string> = {
