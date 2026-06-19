@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
+import { RealtimeProvider } from '@/components/layout/realtime-provider';
 
 export const metadata: Metadata = {
   title: 'Dashboard',
@@ -19,6 +20,9 @@ export default function DashboardLayout({
         <Header />
         <main className="flex-1 p-6">{children}</main>
       </div>
+
+      {/* Mounts Supabase Realtime subscriptions — no visible UI */}
+      <RealtimeProvider />
     </div>
   );
 }

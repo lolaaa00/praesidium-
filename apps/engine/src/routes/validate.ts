@@ -1,8 +1,19 @@
 import { Router, type IRouter, Request, Response } from 'express';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import { agentAuthMiddleware } from '../middleware/agent-auth.js';
 import { runValidation } from '../services/validation.js';
 import { logger } from '../config/logger.js';
+
+// Rate limit: 60 validation requests per minute per agent (keyed by agent API key prefix)
+const validateRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: (req: Request) => req.agent?.id ?? req.ip ?? 'unknown',
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited', message: 'Too many validation requests. Limit: 60/min.' },
+});
 
 const router: IRouter = Router();
 
@@ -20,6 +31,7 @@ const validateSchema = z.object({
 router.post(
   '/v1/validate',
   agentAuthMiddleware,
+  validateRateLimit,
   async (req: Request, res: Response): Promise<void> => {
     const agent = req.agent!;
 

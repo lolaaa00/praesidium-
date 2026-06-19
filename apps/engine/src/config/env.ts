@@ -10,8 +10,8 @@ const envSchema = z.object({
 
   // GenLayer
   GENLAYER_PRIVATE_KEY: z.string().min(1),
-  GENLAYER_CONTRACT_ADDRESS: z.string().min(1),
-  GENLAYER_RPC_URL: z.string().url(),
+  GENLAYER_CONTRACT_ADDRESS: z.string().default(''),
+  GENLAYER_RPC_URL: z.string().url().default('https://studio.genlayer.com/api'),
 });
 
 export type Env = z.infer<typeof envSchema>;
