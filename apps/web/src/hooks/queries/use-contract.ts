@@ -22,7 +22,11 @@ export function useContractStatus() {
     queryKey: contractKeys.status(),
     queryFn: async () => {
       const res = await orgFetch('/api/contract/status');
-      return parseResponse<ContractStatus>(res);
+      const raw = await parseResponse<{ status: string; contractAddress?: string }>(res);
+      // Normalise engine status values to our UI vocabulary
+      const status: ContractStatus['status'] =
+        raw.status === 'ok' ? 'healthy' : raw.status === 'degraded' ? 'degraded' : 'offline';
+      return { ...raw, status, contractAddress: raw.contractAddress ?? undefined } as ContractStatus;
     },
     refetchInterval: 30_000,
     retry: false,

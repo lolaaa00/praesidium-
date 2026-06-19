@@ -1,9 +1,114 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft, Shield } from 'lucide-react';
+import { useCreatePolicy } from '@/hooks/queries/use-policies';
+
 export default function NewPolicyPage() {
+  const router = useRouter();
+  const createPolicy = useCreatePolicy();
+
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (!name.trim()) {
+      setError('Policy name is required.');
+      return;
+    }
+    try {
+      const result = await createPolicy.mutateAsync({
+        name: name.trim(),
+        description: description.trim() || undefined,
+      });
+      router.push(`/policies/${result.policy.id}`);
+    } catch (err) {
+      setError((err as Error).message ?? 'Failed to create policy.');
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">New Policy</h1>
-        <p className="text-muted-foreground">Create a new compliance policy.</p>
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href="/policies" className="rounded-md p-1.5 hover:bg-accent transition-colors">
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">New Policy</h1>
+          <p className="text-muted-foreground">Create a compliance policy. Rules can be added after creation.</p>
+        </div>
+      </div>
+
+      <div className="max-w-2xl">
+        <form onSubmit={handleSubmit} className="rounded-xl border bg-card p-6 shadow-sm space-y-6">
+          {/* Icon */}
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+            <Shield className="h-6 w-6 text-primary" />
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Policy Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Financial Operations Safety Policy"
+                required
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Choose a clear, descriptive name for this compliance policy.
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium">Description</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                placeholder="Describe the purpose and scope of this policy..."
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={createPolicy.isPending || !name.trim()}
+              className="rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {createPolicy.isPending ? 'Creating…' : 'Create Policy'}
+            </button>
+            <Link
+              href="/policies"
+              className="rounded-md border px-5 py-2 text-sm font-medium hover:bg-accent transition-colors"
+            >
+              Cancel
+            </Link>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            The policy will be created as a <strong>draft</strong>. Add rules, then activate it
+            when ready to enforce compliance.
+          </p>
+        </form>
       </div>
     </div>
   );
