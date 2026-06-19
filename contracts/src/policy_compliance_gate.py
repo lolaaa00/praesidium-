@@ -3,6 +3,7 @@
 # multi-validator LLM consensus via prompt_non_comparative equivalence.
 
 from genlayer import *
+from dataclasses import dataclass
 import json
 
 
@@ -19,7 +20,6 @@ class ValidationRecord:
     reasoning: str
     violations: str  # JSON-encoded array
     validator_count: u32
-    timestamp: u256
 
 
 @allow_storage
@@ -30,7 +30,10 @@ class AgentReputation:
     rejected_count: u256
     escalated_count: u256
     cumulative_compliance: u256
-    last_updated: u256
+    # No timestamp field: this GenVM SDK version exposes no deterministic
+    # block-time primitive, and a wall-clock read would diverge between
+    # leader and validators during consensus replay. Supabase's created_at
+    # is the source of truth for validation timing off-chain.
 
 
 class PolicyComplianceGate(gl.Contract):
@@ -136,50 +139,43 @@ You MUST respond with ONLY a valid JSON object (no markdown, no explanation outs
 If no violations are found, set violations to an empty array [].
 """
 
-        leader_result = gl.exec_prompt(leader_prompt)
-
         # ── Validator consensus via prompt_non_comparative ──
-        # Each validator independently checks if the leader's evaluation is correct
-        # by re-examining the same data against the same rules
-        validator_prompt = f"""You are auditing an AI policy compliance evaluation.
+        # The leader runs leader_fn() to produce its answer. Each validator
+        # independently re-runs leader_fn() and checks the leader's answer
+        # against task/criteria, rather than reproducing the full analysis.
+        # eq_principle requires fn() to return a str, so the dict from the
+        # JSON-mode prompt is re-serialized before being passed back.
+        def leader_fn() -> str:
+            return json.dumps(gl.nondet.exec_prompt(leader_prompt, response_format="json"))
 
-ORIGINAL POLICY RULES:
-{rules_text}
-
-ACTION THAT WAS EVALUATED:
-- Type: {action_type}
-- Payload: {action_payload}
-- Context: {context}
-
-LEADER'S EVALUATION:
-{leader_result}
-
-TASK: Determine if the leader's evaluation is CORRECT.
-Consider:
-1. Did the leader correctly identify all rule violations (no false negatives)?
-2. Are the identified violations actually violations (no false positives)?
-3. Is the compliance score reasonable for the violations found?
-4. Is the verdict consistent with the score and violations?
-
-Respond with ONLY "True" if the evaluation is correct, or "False" if it contains errors."""
-
-        # prompt_non_comparative: validators check the leader's answer
-        # against the source data, rather than producing their own analysis
-        gl.eq_principle.prompt_non_comparative(
-            leader_result,
-            validator_prompt,
+        leader_result = gl.eq_principle.prompt_non_comparative(
+            leader_fn,
+            task=(
+                "Evaluate whether an AI agent's proposed action complies with the "
+                "given policy rules, and produce a structured JSON compliance verdict."
+            ),
+            criteria=(
+                "The verdict (approved/conditional/escalated/rejected) must be "
+                "consistent with the compliance_score, and every listed violation "
+                "must be a genuine breach of one of the stated policy rules — no "
+                "false positives or false negatives. The response must be valid "
+                "JSON matching the required schema."
+            ),
         )
 
         # ── Parse and store result ──
         try:
             result = json.loads(leader_result)
-        except json.JSONDecodeError:
-            # If leader produced invalid JSON, create a safe default
+            if not isinstance(result, dict):
+                raise ValueError("leader result is not a JSON object")
+        except (json.JSONDecodeError, ValueError):
+            # If the leader produced an unexpected response shape, fall back
+            # to a safe default rather than blocking the request.
             result = {
                 "verdict": "escalated",
                 "compliance_score": 50,
                 "risk_score": 50,
-                "reasoning": "Leader produced invalid response format. Escalating for human review.",
+                "reasoning": "Leader produced an unexpected response format. Escalating for human review.",
                 "violations": [],
             }
 
@@ -203,7 +199,6 @@ Respond with ONLY "True" if the evaluation is correct, or "False" if it contains
             reasoning=reasoning,
             violations=json.dumps(violations),
             validator_count=u32(3),  # Default validator count
-            timestamp=gl.block.timestamp,
         )
 
         self.validations[request_id] = record
@@ -250,7 +245,6 @@ Respond with ONLY "True" if the evaluation is correct, or "False" if it contains
             rejected_count=u256(rejected),
             escalated_count=u256(escalated),
             cumulative_compliance=u256(cumulative),
-            last_updated=gl.block.timestamp,
         )
 
     # ────────────────────────────────────────
@@ -275,7 +269,6 @@ Respond with ONLY "True" if the evaluation is correct, or "False" if it contains
             "reasoning": record.reasoning,
             "violations": json.loads(record.violations),
             "validator_count": int(record.validator_count),
-            "timestamp": int(record.timestamp),
         })
 
     @gl.public.view

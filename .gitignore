@@ -42,5 +42,13 @@ pnpm-debug.log*
 supabase/.temp/
 supabase/.branches/
 
+# Contract deployment records (private key derived address, regenerated per deploy)
+contracts/deploy/deployed.json
+contracts/artifacts/
+contracts/.venv/
+contracts/.pytest_cache/
+__pycache__/
+*.pyc
+
 # Misc
 *.tsbuildinfo
