@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, RefreshCw, Clock } from 'lucide-react';
-import { useContractStatus } from '@/hooks/queries/use-contract';
-import { useQueryClient } from '@tanstack/react-query';
-import { contractKeys } from '@/hooks/queries/use-contract';
+import { useAccount } from 'wagmi';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, RefreshCw, Clock, Pause, Play } from 'lucide-react';
+import { useContractStatus, contractKeys } from '@/hooks/queries/use-contract';
+import { readContractPublic, writeContractAsUser } from '@/lib/genlayer/client';
 
 const STATUS_CONFIG: Record<string, { icon: React.ElementType; badge: string; label: string }> = {
   healthy: { icon: CheckCircle, badge: 'bg-pass/15 text-pass', label: 'Healthy' },
@@ -21,13 +23,34 @@ const SYSTEM_CHECKS = [
 export default function SystemHealthPage() {
   const { data, isLoading, dataUpdatedAt } = useContractStatus();
   const qc = useQueryClient();
+  const { address } = useAccount();
+  const [chainStatus, setChainStatus] = useState<string | null>(null);
 
   const status = data?.status ?? 'offline';
   const cfg = STATUS_CONFIG[status] ?? { icon: XCircle, badge: 'bg-fail/15 text-fail', label: 'Offline' };
   const StatusIcon = cfg.icon;
 
+  const { data: isPaused, refetch: refetchPaused } = useQuery({
+    queryKey: ['genlayer', 'is_paused'],
+    queryFn: () => readContractPublic('is_paused') as Promise<boolean>,
+  });
+
   function handleRefresh() {
     qc.invalidateQueries({ queryKey: contractKeys.status() });
+    refetchPaused();
+  }
+
+  async function handleTogglePause() {
+    if (!address) return;
+    try {
+      setChainStatus(`Confirm in your wallet to ${isPaused ? 'resume' : 'pause'} validation...`);
+      await writeContractAsUser(address, isPaused ? 'unpause' : 'pause', []);
+      await refetchPaused();
+    } catch (chainErr) {
+      console.warn('Pause toggle failed:', chainErr);
+    } finally {
+      setChainStatus(null);
+    }
   }
 
   return (
@@ -130,6 +153,36 @@ export default function SystemHealthPage() {
           </div>
         </div>
       )}
+
+      {/* Validation pause switch */}
+      <div className="rounded-xl border bg-card p-6 shadow-sm">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-semibold">Validation Processing</h2>
+            <p className="text-sm text-muted-foreground">
+              {isPaused
+                ? 'validate_action is currently paused — agent submissions are being rejected on-chain.'
+                : 'validate_action is running normally.'}
+            </p>
+          </div>
+          <button
+            onClick={handleTogglePause}
+            disabled={!address}
+            title={!address ? 'Connect a wallet to manage this' : undefined}
+            className={`flex shrink-0 items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+              isPaused
+                ? 'border-pass/30 text-pass hover:bg-pass/10'
+                : 'border-warn/30 text-warn hover:bg-warn/10'
+            }`}
+          >
+            {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+            {isPaused ? 'Resume Validation' : 'Pause Validation'}
+          </button>
+        </div>
+        {chainStatus && (
+          <div className="mt-3 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">{chainStatus}</div>
+        )}
+      </div>
 
       {/* Environment */}
       <div className="rounded-xl border bg-card p-6 shadow-sm space-y-3">

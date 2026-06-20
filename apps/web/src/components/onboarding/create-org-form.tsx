@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAccount } from 'wagmi';
 import { Building2, Loader2, ArrowLeft } from 'lucide-react';
 import { useOrgStore } from '@/stores/org-store';
+import { writeContractAsUser } from '@/lib/genlayer/client';
 
 interface CreateOrgFormProps {
   onBack: () => void;
@@ -11,10 +13,12 @@ interface CreateOrgFormProps {
 
 export function CreateOrgForm({ onBack }: CreateOrgFormProps) {
   const router = useRouter();
+  const { address } = useAccount();
   const { setCurrentOrg } = useOrgStore();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [chainStatus, setChainStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const slug = name
@@ -50,6 +54,20 @@ export function CreateOrgForm({ onBack }: CreateOrgFormProps) {
         slug: data.organization.slug,
         role: 'owner',
       });
+
+      // Register the org on-chain, signed by the creator's wallet. Best
+      // effort — the org already exists in Supabase regardless, so a
+      // rejected/failed signature here shouldn't block onboarding.
+      if (address) {
+        try {
+          setChainStatus('Confirm in your wallet to register the org on-chain...');
+          await writeContractAsUser(address, 'register_org', [data.organization.id, data.organization.name]);
+        } catch (chainErr) {
+          console.warn('On-chain org registration skipped:', chainErr);
+        } finally {
+          setChainStatus(null);
+        }
+      }
 
       router.push('/overview');
     } catch (err) {
@@ -119,6 +137,12 @@ export function CreateOrgForm({ onBack }: CreateOrgFormProps) {
             maxLength={500}
           />
         </div>
+
+        {chainStatus && (
+          <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
+            {chainStatus}
+          </div>
+        )}
 
         {error && (
           <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">

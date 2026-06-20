@@ -86,3 +86,36 @@ export async function readContractPublic(functionName: string, args: unknown[] =
     args: args as any,
   });
 }
+
+/**
+ * Registers an org on-chain if it isn't already, signed by the connected
+ * wallet. Policy/agent registration both require the org to exist on-chain
+ * first (validate_action does not — it stays permissive for unregistered
+ * agents/orgs so the engine's existing integration keeps working).
+ *
+ * Safe to call before every policy/agent registration: it's a single read
+ * plus, at most, one extra signature the first time a given org is touched.
+ */
+export async function ensureOrgRegisteredOnChain(
+  walletAddress: `0x${string}`,
+  orgId: string,
+  orgName: string,
+): Promise<void> {
+  const existing = (await readContractPublic('get_org', [orgId])) as string;
+  const parsed = JSON.parse(existing) as { error?: string };
+  if (!parsed.error) {
+    return;
+  }
+  await writeContractAsUser(walletAddress, 'register_org', [orgId, orgName]);
+}
+
+/**
+ * SHA-256 hex digest, used as the on-chain rules_hash so a validation
+ * record can later be checked against the exact policy text that was in
+ * force when it ran. Not a security boundary — just an integrity fingerprint.
+ */
+export async function hashText(text: string): Promise<string> {
+  const data = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return '0x' + Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}

@@ -2,6 +2,7 @@
 
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAccount } from 'wagmi';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -25,6 +26,8 @@ import {
   useUpdateRule,
   useDeleteRule,
 } from '@/hooks/queries/use-policies';
+import { useOrgStore } from '@/stores/org-store';
+import { ensureOrgRegisteredOnChain, writeContractAsUser, hashText } from '@/lib/genlayer/client';
 
 const SEVERITY_BADGE: Record<string, string> = {
   low: 'bg-cornflower/15 text-maxblue-2',
@@ -64,6 +67,8 @@ export default function PolicyDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const { address } = useAccount();
+  const { currentOrgName } = useOrgStore();
 
   const { data, isLoading } = usePolicy(id);
   const updatePolicy = useUpdatePolicy();
@@ -77,6 +82,7 @@ export default function PolicyDetailPage({
   const [ruleForm, setRuleForm] = useState<RuleFormState>(emptyRule);
   const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set());
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const [chainStatus, setChainStatus] = useState<string | null>(null);
 
   const policy = data?.policy;
   const rules = policy?.policy_rules ?? [];
@@ -111,6 +117,38 @@ export default function PolicyDetailPage({
 
   async function handleActivate() {
     await updatePolicy.mutateAsync({ id, status: 'active' });
+
+    // Commit a real rules hash on-chain at the moment a policy goes live —
+    // not on every edit while it's still a draft, which would mean a wallet
+    // signature per rule toggle. Best effort: activation already succeeded
+    // in Supabase regardless of whether this on-chain step works.
+    if (address && policy) {
+      try {
+        setChainStatus('Confirm in your wallet to commit the rules hash on-chain...');
+        await ensureOrgRegisteredOnChain(address, policy.org_id, currentOrgName ?? policy.org_id);
+        const rulesSnapshot = JSON.stringify(
+          rules.map((r) => ({
+            name: r.name,
+            severity: r.severity,
+            enabled: r.enabled,
+            condition: r.rule_definition?.condition,
+            actionTypes: r.rule_definition?.actionTypes,
+          })),
+        );
+        const rulesHash = await hashText(rulesSnapshot);
+        try {
+          await writeContractAsUser(address, 'update_policy_rules', [id, rulesHash]);
+        } catch {
+          // Policy predates on-chain registration (created before this
+          // feature shipped) — register it now with the real hash instead.
+          await writeContractAsUser(address, 'register_policy', [id, policy.org_id, policy.name, rulesHash]);
+        }
+      } catch (chainErr) {
+        console.warn('On-chain rules hash commit skipped:', chainErr);
+      } finally {
+        setChainStatus(null);
+      }
+    }
   }
 
   async function handleArchive() {
@@ -260,6 +298,10 @@ export default function PolicyDetailPage({
           </div>
         )}
       </div>
+
+      {chainStatus && (
+        <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">{chainStatus}</div>
+      )}
 
       {/* Meta info */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

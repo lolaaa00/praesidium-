@@ -2,17 +2,23 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAccount } from 'wagmi';
 import Link from 'next/link';
 import { ArrowLeft, Shield } from 'lucide-react';
 import { useCreatePolicy } from '@/hooks/queries/use-policies';
+import { useOrgStore } from '@/stores/org-store';
+import { ensureOrgRegisteredOnChain, writeContractAsUser, hashText } from '@/lib/genlayer/client';
 
 export default function NewPolicyPage() {
   const router = useRouter();
+  const { address } = useAccount();
+  const { currentOrgId, currentOrgName } = useOrgStore();
   const createPolicy = useCreatePolicy();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
+  const [chainStatus, setChainStatus] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,6 +32,28 @@ export default function NewPolicyPage() {
         name: name.trim(),
         description: description.trim() || undefined,
       });
+
+      // Register the policy on-chain, signed by the creator. No rules exist
+      // yet at creation time, so the hash is a placeholder over the name —
+      // it's recomputed for real once rules are added (update_policy_rules).
+      if (address && currentOrgId) {
+        try {
+          setChainStatus('Confirm in your wallet to register the policy on-chain...');
+          await ensureOrgRegisteredOnChain(address, currentOrgId, currentOrgName ?? currentOrgId);
+          const placeholderHash = await hashText(name.trim());
+          await writeContractAsUser(address, 'register_policy', [
+            result.policy.id,
+            currentOrgId,
+            name.trim(),
+            placeholderHash,
+          ]);
+        } catch (chainErr) {
+          console.warn('On-chain policy registration skipped:', chainErr);
+        } finally {
+          setChainStatus(null);
+        }
+      }
+
       router.push(`/policies/${result.policy.id}`);
     } catch (err) {
       setError((err as Error).message ?? 'Failed to create policy.');
@@ -81,6 +109,12 @@ export default function NewPolicyPage() {
               />
             </div>
           </div>
+
+          {chainStatus && (
+            <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
+              {chainStatus}
+            </div>
+          )}
 
           {error && (
             <div className="rounded-md bg-fail/10 border border-fail/30 px-4 py-3 text-sm text-fail">

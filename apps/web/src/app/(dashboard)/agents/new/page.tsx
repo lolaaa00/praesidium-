@@ -2,9 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAccount } from 'wagmi';
 import Link from 'next/link';
 import { ArrowLeft, Bot, Copy, Check, AlertTriangle } from 'lucide-react';
 import { useRegisterAgent } from '@/hooks/queries/use-agents';
+import { useOrgStore } from '@/stores/org-store';
+import { ensureOrgRegisteredOnChain, writeContractAsUser } from '@/lib/genlayer/client';
 
 const AGENT_TYPES = [
   { value: 'chatbot', label: 'Chatbot', desc: 'Conversational agent that interacts with users' },
@@ -15,12 +18,15 @@ const AGENT_TYPES = [
 
 export default function RegisterAgentPage() {
   const router = useRouter();
+  const { address } = useAccount();
+  const { currentOrgId, currentOrgName } = useOrgStore();
   const registerAgent = useRegisterAgent();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [agentType, setAgentType] = useState<typeof AGENT_TYPES[number]['value']>('autonomous');
   const [error, setError] = useState('');
+  const [chainStatus, setChainStatus] = useState<string | null>(null);
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -38,6 +44,28 @@ export default function RegisterAgentPage() {
         agentType,
       });
       setNewApiKey(result.apiKey);
+
+      // Register the agent on-chain, signed by the registering user. Best
+      // effort — the agent already works via the engine regardless, since
+      // validate_action stays permissive for unregistered agents.
+      if (address && currentOrgId) {
+        try {
+          setChainStatus('Confirm in your wallet to register the agent on-chain...');
+          await ensureOrgRegisteredOnChain(address, currentOrgId, currentOrgName ?? currentOrgId);
+          await writeContractAsUser(address, 'register_agent', [
+            result.agent.id,
+            currentOrgId,
+            name.trim(),
+            agentType,
+            true,
+            agentType !== 'chatbot',
+          ]);
+        } catch (chainErr) {
+          console.warn('On-chain agent registration skipped:', chainErr);
+        } finally {
+          setChainStatus(null);
+        }
+      }
     } catch (err) {
       setError((err as Error).message ?? 'Failed to register agent.');
     }
@@ -65,6 +93,12 @@ export default function RegisterAgentPage() {
         </div>
 
         <div className="max-w-2xl space-y-4">
+          {chainStatus && (
+            <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
+              {chainStatus}
+            </div>
+          )}
+
           <div className="rounded-xl border border-warn/30 bg-warn/10 p-6">
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warn" />

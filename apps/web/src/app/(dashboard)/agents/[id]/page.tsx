@@ -2,6 +2,7 @@
 
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAccount } from 'wagmi';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -16,6 +17,8 @@ import {
 } from 'lucide-react';
 import { useAgent, useUpdateAgent, useRevokeAgent } from '@/hooks/queries/use-agents';
 import { useValidations } from '@/hooks/queries/use-validations';
+import { useOrgStore } from '@/stores/org-store';
+import { ensureOrgRegisteredOnChain, writeContractAsUser } from '@/lib/genlayer/client';
 
 const TYPE_LABEL: Record<string, string> = {
   chatbot: 'Chatbot',
@@ -44,6 +47,8 @@ export default function AgentDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const { address } = useAccount();
+  const { currentOrgName } = useOrgStore();
 
   const { data, isLoading } = useAgent(id);
   const { data: vData } = useValidations({ agentId: id, limit: 10 });
@@ -54,6 +59,7 @@ export default function AgentDetailPage({
   const [copied, setCopied] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
+  const [chainStatus, setChainStatus] = useState<string | null>(null);
 
   const agent = data?.agent;
   const validations = (vData?.validations ?? []) as Array<Record<string, unknown>>;
@@ -68,15 +74,47 @@ export default function AgentDetailPage({
     }
   }
 
+  // Calls the on-chain status-change method, registering the agent first
+  // if it predates on-chain registration. Best effort — Supabase is always
+  // updated regardless of whether this succeeds.
+  async function syncAgentStatusOnChain(targetStatus: 'active' | 'suspended' | 'revoked') {
+    if (!address || !agent) return;
+    const method =
+      targetStatus === 'active' ? 'reinstate_agent' : targetStatus === 'suspended' ? 'suspend_agent' : 'revoke_agent';
+    try {
+      setChainStatus(`Confirm in your wallet to ${method.replace('_', ' ')} on-chain...`);
+      await ensureOrgRegisteredOnChain(address, agent.org_id, currentOrgName ?? agent.org_id);
+      try {
+        await writeContractAsUser(address, method, [id]);
+      } catch {
+        await writeContractAsUser(address, 'register_agent', [
+          id,
+          agent.org_id,
+          agent.name,
+          agent.agent_type,
+          true,
+          agent.agent_type !== 'chatbot',
+        ]);
+        if (targetStatus !== 'active') {
+          await writeContractAsUser(address, method, [id]);
+        }
+      }
+    } catch (chainErr) {
+      console.warn('On-chain agent status sync skipped:', chainErr);
+    } finally {
+      setChainStatus(null);
+    }
+  }
+
   async function handleSuspend() {
-    await updateAgent.mutateAsync({
-      id,
-      status: agent?.status === 'suspended' ? 'active' : 'suspended',
-    });
+    const targetStatus = agent?.status === 'suspended' ? 'active' : 'suspended';
+    await updateAgent.mutateAsync({ id, status: targetStatus });
+    await syncAgentStatusOnChain(targetStatus);
   }
 
   async function handleRevoke() {
     await revokeAgent.mutateAsync(id);
+    await syncAgentStatusOnChain('revoked');
     router.push('/agents');
   }
 
@@ -113,6 +151,10 @@ export default function AgentDetailPage({
 
   return (
     <div className="space-y-6">
+      {chainStatus && (
+        <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">{chainStatus}</div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4">
