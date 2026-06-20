@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from('validation_requests')
     .select(
-      '*, agent:agents(id, name, agent_type), policy:policies(id, name), validation_results(*)',
+      '*, agent:agents(id, name, agent_type), policy:policies(id, name), validation_results(*), escalations(*)',
       { count: 'exact' },
     )
     .eq('org_id', orgId)

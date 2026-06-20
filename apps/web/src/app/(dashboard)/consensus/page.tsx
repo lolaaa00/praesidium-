@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAccount } from 'wagmi';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -15,13 +16,15 @@ import {
 } from 'lucide-react';
 import { useValidations } from '@/hooks/queries/use-validations';
 import { useContractStatus } from '@/hooks/queries/use-contract';
+import { useResolveEscalation } from '@/hooks/queries/use-escalations';
+import { ensureOrgRegisteredOnChain, writeContractAsUser } from '@/lib/genlayer/client';
+import { useOrgStore } from '@/stores/org-store';
 
-const ESCALATION_TYPE_LABEL: Record<string, string> = {
-  human_review: 'Human Review',
-  policy_exception: 'Policy Exception',
-  high_risk: 'High Risk',
-  ambiguous: 'Ambiguous',
-};
+const RESOLUTION_OPTIONS = [
+  { value: 'approved' as const, label: 'Approve action' },
+  { value: 'rejected' as const, label: 'Reject action' },
+  { value: 'policy_updated' as const, label: 'Approve & update policy' },
+];
 
 const VERDICT_BADGE: Record<string, string> = {
   approved: 'bg-pass/15 text-pass',
@@ -33,6 +36,14 @@ const VERDICT_BADGE: Record<string, string> = {
 export default function ConsensusPage() {
   const [tab, setTab] = useState<'escalated' | 'recent'>('escalated');
   const router = useRouter();
+  const { address } = useAccount();
+  const { currentOrgName } = useOrgStore();
+  const resolveEscalation = useResolveEscalation();
+
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [resolutionStatus, setResolutionStatus] = useState<'approved' | 'rejected' | 'policy_updated'>('approved');
+  const [resolutionNote, setResolutionNote] = useState('');
+  const [chainStatus, setChainStatus] = useState<string | null>(null);
 
   const { data: escalatedData, isLoading: escalatedLoading } = useValidations({
     verdict: 'escalated',
@@ -43,6 +54,43 @@ export default function ConsensusPage() {
     limit: 20,
   });
   const { data: contractStatus } = useContractStatus();
+
+  function startResolving(escalationId: string) {
+    setResolvingId(escalationId);
+    setResolutionStatus('approved');
+    setResolutionNote('');
+  }
+
+  async function submitResolution(escalationId: string, requestId: string, orgId: string) {
+    if (!resolutionNote.trim()) return;
+
+    await resolveEscalation.mutateAsync({
+      id: escalationId,
+      status: resolutionStatus,
+      resolutionNote: resolutionNote.trim(),
+    });
+    setResolvingId(null);
+
+    // Mirror the resolution on-chain, signed by the resolving admin. Best
+    // effort — the Supabase record is the source of truth and is already
+    // updated regardless of whether this succeeds.
+    if (address) {
+      try {
+        setChainStatus('Confirm in your wallet to record the resolution on-chain...');
+        const onChainStatus = resolutionStatus === 'rejected' ? 'dismissed' : 'resolved';
+        await ensureOrgRegisteredOnChain(address, orgId, currentOrgName ?? orgId);
+        await writeContractAsUser(address, 'resolve_escalation', [
+          `esc-${requestId}`,
+          onChainStatus,
+          resolutionNote.trim(),
+        ]);
+      } catch (chainErr) {
+        console.warn('On-chain escalation resolution skipped:', chainErr);
+      } finally {
+        setChainStatus(null);
+      }
+    }
+  }
 
   const isLoading = tab === 'escalated' ? escalatedLoading : recentLoading;
   const validations = (
@@ -77,6 +125,10 @@ export default function ConsensusPage() {
           )}
         </div>
       </div>
+
+      {chainStatus && (
+        <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">{chainStatus}</div>
+      )}
 
       {/* Stats bar */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -236,18 +288,86 @@ export default function ConsensusPage() {
                       )}
                     </div>
 
-                    {/* Escalation tags */}
+                    {/* Escalations */}
                     {escalations.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {escalations.map((esc) => (
-                          <span
-                            key={esc.id as string}
-                            className="rounded-md bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn"
-                          >
-                            {ESCALATION_TYPE_LABEL[esc.escalation_type as string] ??
-                              (esc.escalation_type as string)}
-                          </span>
-                        ))}
+                      <div className="mt-2 space-y-2">
+                        {escalations.map((esc) => {
+                          const escId = esc.id as string;
+                          const escStatus = esc.status as string;
+                          const isOpen = escStatus === 'open';
+                          const isResolving = resolvingId === escId;
+
+                          return (
+                            <div key={escId} onClick={(e) => e.stopPropagation()}>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={`rounded-md px-2 py-0.5 text-xs font-medium ${
+                                    isOpen ? 'bg-warn/15 text-warn' : 'bg-pass/15 text-pass'
+                                  }`}
+                                >
+                                  {isOpen ? 'Open escalation' : `Resolved: ${escStatus}`}
+                                </span>
+                                <span className="text-xs text-muted-foreground truncate max-w-md">
+                                  {esc.reason as string}
+                                </span>
+                                {isOpen && !isResolving && (
+                                  <button
+                                    onClick={() => startResolving(escId)}
+                                    className="rounded-md border border-primary/30 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                                  >
+                                    Resolve
+                                  </button>
+                                )}
+                              </div>
+
+                              {isResolving && (
+                                <div className="mt-2 rounded-lg border bg-muted/40 p-3 space-y-2">
+                                  <select
+                                    value={resolutionStatus}
+                                    onChange={(e) =>
+                                      setResolutionStatus(e.target.value as typeof resolutionStatus)
+                                    }
+                                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                                  >
+                                    {RESOLUTION_OPTIONS.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <textarea
+                                    value={resolutionNote}
+                                    onChange={(e) => setResolutionNote(e.target.value)}
+                                    placeholder="Resolution notes (required) — what did you decide and why?"
+                                    rows={2}
+                                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm resize-none"
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() =>
+                                        submitResolution(
+                                          escId,
+                                          v.id as string,
+                                          v.org_id as string,
+                                        )
+                                      }
+                                      disabled={resolveEscalation.isPending || !resolutionNote.trim()}
+                                      className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                                    >
+                                      {resolveEscalation.isPending ? 'Resolving…' : 'Submit Resolution'}
+                                    </button>
+                                    <button
+                                      onClick={() => setResolvingId(null)}
+                                      className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 
