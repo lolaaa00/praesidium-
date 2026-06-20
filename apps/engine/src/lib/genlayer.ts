@@ -1,4 +1,6 @@
 import { createClient, createAccount } from 'genlayer-js';
+import { studionet } from 'genlayer-js/chains';
+import { TransactionStatus } from 'genlayer-js/types';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 
@@ -9,16 +11,18 @@ let _account: any = null;
 
 /**
  * Get the GenLayer client (singleton).
+ *
+ * This is the engine's own service account, used only for the
+ * agent-submitted validate_action path — agents are backend processes with
+ * no wallet to sign with, so the engine signs on their behalf. Org/policy/
+ * agent management actions a human performs in the dashboard go through the
+ * user's own connected wallet instead (see apps/web/src/lib/genlayer).
  */
 export function getGenlayerClient() {
   if (!_client) {
     _client = createClient({
-      chain: {
-        id: 0,
-        name: 'genlayer-studio',
-        nativeCurrency: { name: 'GEN', symbol: 'GEN', decimals: 18 },
-        rpcUrls: { default: { http: [env.GENLAYER_RPC_URL] } },
-      },
+      chain: studionet,
+      account: getAccount(),
     });
   }
   return _client;
@@ -60,7 +64,7 @@ export async function callContract(
 
     const receipt = await client.waitForTransactionReceipt({
       hash: txHash,
-      status: 'FINALIZED',
+      status: TransactionStatus.FINALIZED,
     });
 
     logger.info({ txHash, status: receipt.status }, 'Transaction finalized');

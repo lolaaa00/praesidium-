@@ -15,6 +15,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { config } from 'dotenv';
 import { createClient, createAccount } from 'genlayer-js';
+import { studionet } from 'genlayer-js/chains';
+import { TransactionStatus } from 'genlayer-js/types';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONTRACT_PATH = join(__dirname, '../src/policy_compliance_gate.py');
@@ -24,7 +26,6 @@ const DEPLOYED_PATH = join(__dirname, 'deployed.json');
 config({ path: ENV_PATH });
 
 const PRIVATE_KEY = process.env.GENLAYER_PRIVATE_KEY;
-const RPC_URL = process.env.GENLAYER_RPC_URL ?? 'https://studio.genlayer.com/api';
 
 async function main() {
   if (!PRIVATE_KEY) {
@@ -40,16 +41,11 @@ async function main() {
   const account = createAccount(PRIVATE_KEY as `0x${string}`);
 
   console.log(`Deployer address: ${account.address}`);
-  console.log(`RPC: ${RPC_URL}`);
+  console.log(`Chain: ${studionet.name}`);
   console.log('Submitting deployment transaction...');
 
   const client = createClient({
-    chain: {
-      id: 0,
-      name: 'genlayer-studio',
-      nativeCurrency: { name: 'GEN', symbol: 'GEN', decimals: 18 },
-      rpcUrls: { default: { http: [RPC_URL] } },
-    },
+    chain: studionet,
     account,
   });
 
@@ -65,11 +61,10 @@ async function main() {
   const receipt = await client.waitForTransactionReceipt({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     hash: txHash as any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    status: 'FINALIZED' as any,
+    status: TransactionStatus.FINALIZED,
   });
 
-  const contractAddress = receipt.to_address ?? receipt.data?.contract_address;
+  const contractAddress = receipt.to_address ?? (receipt.data?.contract_address as string | undefined);
 
   if (!contractAddress) {
     console.error('Could not determine contract address from receipt. Full receipt:');

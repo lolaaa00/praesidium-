@@ -45,8 +45,8 @@ importers:
         specifier: ^7.4.0
         version: 7.5.1(express@4.22.2)
       genlayer-js:
-        specifier: ^0.6.0
-        version: 0.6.4(@typescript-eslint/parser@8.61.1(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)(zod@3.25.76)
+        specifier: ^1.1.0
+        version: 1.1.8(@typescript-eslint/parser@8.61.1(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(bufferutil@4.1.0)(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
       helmet:
         specifier: ^8.0.0
         version: 8.2.0
@@ -169,8 +169,8 @@ importers:
         specifier: ^4.1.0
         version: 4.4.0
       genlayer-js:
-        specifier: ^0.6.0
-        version: 0.6.4(bufferutil@4.1.0)(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+        specifier: ^1.1.0
+        version: 1.1.8(@typescript-eslint/parser@8.61.1(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(bufferutil@4.1.0)(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
       lucide-react:
         specifier: ^0.460.0
         version: 0.460.0(react@19.2.7)
@@ -239,8 +239,8 @@ importers:
   contracts:
     dependencies:
       genlayer-js:
-        specifier: ^0.6.0
-        version: 0.6.4(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
+        specifier: ^1.1.0
+        version: 1.1.8(bufferutil@4.1.0)(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)(utf-8-validate@5.0.10)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -3401,8 +3401,8 @@ packages:
     resolution: {integrity: sha512-SFdFmIJi+ybC0vjlHN0ZGVGHc3lgE0DxPAT0djjVg+kjOnSqclqmj0KQ7ykTOLP6YxoqOvuAODGdcHJn+43q3g==}
     engines: {node: '>= 0.4'}
 
-  genlayer-js@0.6.4:
-    resolution: {integrity: sha512-tbsBRyVUGZ0a+661ML6wu3U3p5CtHkik7a4qTc68OZgf1pX1G4JBs7CzAmqAkMt8HUyD/J413raDs9Q5s3psWw==}
+  genlayer-js@1.1.8:
+    resolution: {integrity: sha512-qlqh8oqR9Ad7FVbIdqIrHfsMPLLJ24ZRHUZ2LGMpw6DX5ySjrEWdV1X93bVIHO44cu9CLGdx8m2ubkPv78/RLg==}
 
   get-caller-file@2.0.5:
     resolution: {integrity: sha512-DyFP3BM/3YHTQOCUL/w0OZHR0lpKeGrxotcHWcqNEdnltqFwXVfhEBQ94eIo34AfQpo0rGki4cyIiftY06h2Fg==}
@@ -9407,7 +9407,7 @@ snapshots:
 
   generator-function@2.0.1: {}
 
-  genlayer-js@0.6.4(@typescript-eslint/parser@8.61.1(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)(zod@3.25.76):
+  genlayer-js@1.1.8(@typescript-eslint/parser@8.61.1(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(bufferutil@4.1.0)(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76):
     dependencies:
       eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.61.1(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(eslint@9.39.4(jiti@1.21.7))
       typescript-parsec: 0.3.4
@@ -9423,27 +9423,11 @@ snapshots:
       - utf-8-validate
       - zod
 
-  genlayer-js@0.6.4(bufferutil@4.1.0)(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76):
+  genlayer-js@1.1.8(bufferutil@4.1.0)(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)(utf-8-validate@5.0.10):
     dependencies:
       eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.61.1(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(eslint@9.39.4(jiti@1.21.7))
       typescript-parsec: 0.3.4
-      viem: 2.52.2(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
-    transitivePeerDependencies:
-      - '@typescript-eslint/parser'
-      - bufferutil
-      - eslint
-      - eslint-import-resolver-typescript
-      - eslint-import-resolver-webpack
-      - supports-color
-      - typescript
-      - utf-8-validate
-      - zod
-
-  genlayer-js@0.6.4(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3):
-    dependencies:
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.61.1(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(eslint@9.39.4(jiti@1.21.7))
-      typescript-parsec: 0.3.4
-      viem: 2.52.2(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.22.4)
+      viem: 2.52.2(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - '@typescript-eslint/parser'
       - bufferutil
@@ -11154,6 +11138,23 @@ snapshots:
       isows: 1.0.6(ws@8.18.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))
       ox: 0.6.7(typescript@5.9.3)(zod@3.25.76)
       ws: 8.18.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+    optionalDependencies:
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+      - zod
+
+  viem@2.52.2(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10):
+    dependencies:
+      '@noble/curves': 1.9.1
+      '@noble/hashes': 1.8.0
+      '@scure/bip32': 1.7.0
+      '@scure/bip39': 1.6.0
+      abitype: 1.2.3(typescript@5.9.3)(zod@3.22.4)
+      isows: 1.0.7(ws@8.20.1(bufferutil@4.1.0)(utf-8-validate@5.0.10))
+      ox: 0.14.29(typescript@5.9.3)(zod@3.22.4)
+      ws: 8.20.1(bufferutil@4.1.0)(utf-8-validate@5.0.10)
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:

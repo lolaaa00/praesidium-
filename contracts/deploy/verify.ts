@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { config } from 'dotenv';
 import { createClient, createAccount } from 'genlayer-js';
+import { studionet } from 'genlayer-js/chains';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ENV_PATH = join(__dirname, '../.env');
@@ -19,19 +20,17 @@ const DEPLOYED_PATH = join(__dirname, 'deployed.json');
 
 config({ path: ENV_PATH });
 
-const RPC_URL = process.env.GENLAYER_RPC_URL ?? 'https://studio.genlayer.com/api';
-
-function resolveContractAddress(): string {
+function resolveContractAddress(): `0x${string}` {
   const cliArg = process.argv[2];
-  if (cliArg) return cliArg;
+  if (cliArg) return cliArg as `0x${string}`;
 
   if (process.env.GENLAYER_CONTRACT_ADDRESS) {
-    return process.env.GENLAYER_CONTRACT_ADDRESS;
+    return process.env.GENLAYER_CONTRACT_ADDRESS as `0x${string}`;
   }
 
   if (existsSync(DEPLOYED_PATH)) {
     const { contractAddress } = JSON.parse(readFileSync(DEPLOYED_PATH, 'utf-8'));
-    if (contractAddress) return contractAddress;
+    if (contractAddress) return contractAddress as `0x${string}`;
   }
 
   throw new Error(
@@ -40,42 +39,36 @@ function resolveContractAddress(): string {
 }
 
 async function main() {
-  const address = resolveContractAddress() as `0x${string}`;
+  const address = resolveContractAddress();
 
-  const client = createClient({
-    chain: {
-      id: 0,
-      name: 'genlayer-studio',
-      nativeCurrency: { name: 'GEN', symbol: 'GEN', decimals: 18 },
-      rpcUrls: { default: { http: [RPC_URL] } },
-    },
-  });
-
-  // An unfunded read-only caller works fine for view methods.
+  // No private key needed for read-only calls — createAccount() with no
+  // argument generates a throwaway local account, which is enough to
+  // satisfy the client's account requirement without spending anything.
   const account = process.env.GENLAYER_PRIVATE_KEY
     ? createAccount(process.env.GENLAYER_PRIVATE_KEY as `0x${string}`)
     : createAccount();
 
+  const client = createClient({
+    chain: studionet,
+    account,
+  });
+
   console.log(`Verifying contract: ${address}`);
-  console.log(`RPC: ${RPC_URL}\n`);
+  console.log(`Chain: ${studionet.name}\n`);
+
+  const stats = await client.readContract({
+    address,
+    functionName: 'get_contract_stats',
+    args: [],
+  });
+  console.log(`✓ get_contract_stats() -> ${JSON.stringify(stats)}`);
 
   const owner = await client.readContract({
-    account,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    address: address as any,
+    address,
     functionName: 'get_owner',
     args: [],
   });
-  console.log(`✓ get_owner()            -> ${owner}`);
-
-  const validationCount = await client.readContract({
-    account,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    address: address as any,
-    functionName: 'get_validation_count',
-    args: [],
-  });
-  console.log(`✓ get_validation_count() -> ${validationCount}`);
+  console.log(`✓ get_owner()           -> ${owner}`);
 
   console.log('\n✅ Contract is deployed and responding to reads.');
 }
