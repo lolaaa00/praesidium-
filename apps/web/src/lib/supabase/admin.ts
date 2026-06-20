@@ -17,6 +17,14 @@ export function createAdminClient() {
         autoRefreshToken: false,
         persistSession: false,
       },
+      global: {
+        // Next.js patches the global fetch in route handlers to add its own
+        // request-deduping/caching layer, which has been observed to make
+        // supabase-js's admin auth calls (e.g. createUser) fail silently
+        // with an empty AuthRetryableFetchError. Forcing cache: 'no-store'
+        // opts this client's requests out of that layer.
+        fetch: (url, options = {}) => fetch(url, { ...options, cache: 'no-store' }),
+      },
     },
   );
 }
