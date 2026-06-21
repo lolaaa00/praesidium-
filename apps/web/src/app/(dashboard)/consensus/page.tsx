@@ -19,6 +19,7 @@ import { useContractStatus } from '@/hooks/queries/use-contract';
 import { useResolveEscalation } from '@/hooks/queries/use-escalations';
 import { ensureOrgRegisteredOnChain, writeContractAsUser } from '@/lib/genlayer/client';
 import { useOrgStore } from '@/stores/org-store';
+import { getErrorMessage } from '@/lib/utils/errors';
 
 const RESOLUTION_OPTIONS = [
   { value: 'approved' as const, label: 'Approve action' },
@@ -84,10 +85,12 @@ export default function ConsensusPage() {
           onChainStatus,
           resolutionNote.trim(),
         ]);
-      } catch (chainErr) {
-        console.warn('On-chain escalation resolution skipped:', chainErr);
-      } finally {
         setChainStatus(null);
+      } catch (chainErr) {
+        console.warn('On-chain escalation resolution failed:', chainErr);
+        setChainStatus(
+          `On-chain escalation resolution failed: ${getErrorMessage(chainErr)}`,
+        );
       }
     }
   }

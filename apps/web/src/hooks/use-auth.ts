@@ -3,11 +3,10 @@
 import { useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAccount, useSignMessage, useConnect, useDisconnect } from 'wagmi';
-import { injected } from 'wagmi/connectors';
+import { injected } from 'wagmi';
 import { useAuthStore } from '@/stores/auth-store';
 import { useOrgStore } from '@/stores/org-store';
 import { buildSignMessage } from '@/lib/wallet/auth';
-import { createClient } from '@/lib/supabase/client';
 
 /**
  * Core auth hook — manages wallet connection, signature-based login,
@@ -46,11 +45,19 @@ export function useAuth() {
             });
           }
         }
-      } else {
+      } else if (res.ok) {
+        // A 200 with no user is a genuine "not signed in" signal from the
+        // server (no valid session cookie) — safe to clear.
         setUser(null);
       }
+      // A non-2xx response here is a transient failure, not a logout signal
+      // (this effect re-runs on every mount of every useAuth() consumer, so
+      // a single network blip during navigation shouldn't deauth the user).
+      // Leave the existing auth state alone and let the next mount retry.
     } catch {
-      setUser(null);
+      // Same reasoning — a fetch failure is not proof the session is gone.
+    } finally {
+      setLoading(false);
     }
   }, [setUser, setLoading, setCurrentOrg]);
 
@@ -95,20 +102,18 @@ export function useAuth() {
         throw new Error(verifyData.error || 'Verification failed');
       }
 
-      // 4. Complete Supabase auth using the token hash
-      if (verifyData.tokenHash && verifyData.email) {
-        const supabase = createClient();
-        await supabase.auth.verifyOtp({
-          email: verifyData.email,
-          token: verifyData.tokenHash,
-          type: 'magiclink',
-        });
-      }
+      setUser({
+        id: verifyData.userId,
+        walletAddress: verifyData.walletAddress,
+        displayName: null,
+        avatarUrl: null,
+        memberships: [],
+      });
 
-      // 5. Load the full session
+      // 4. Load the full session
       await loadSession();
 
-      // 6. Navigate based on state
+      // 5. Navigate based on state
       if (!verifyData.hasOrg) {
         router.push('/onboarding');
       } else {
@@ -127,8 +132,6 @@ export function useAuth() {
     try {
       // Sign out from Supabase
       await fetch('/api/auth/logout', { method: 'POST' });
-      const supabase = createClient();
-      await supabase.auth.signOut();
 
       // Disconnect wallet
       await disconnectAsync();

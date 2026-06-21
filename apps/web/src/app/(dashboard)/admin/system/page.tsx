@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, RefreshCw, Clock, Pause, Play } from 'lucide-react';
 import { useContractStatus, contractKeys } from '@/hooks/queries/use-contract';
 import { readContractPublic, writeContractAsUser } from '@/lib/genlayer/client';
+import { getErrorMessage } from '@/lib/utils/errors';
 
 const STATUS_CONFIG: Record<string, { icon: React.ElementType; badge: string; label: string }> = {
   healthy: { icon: CheckCircle, badge: 'bg-pass/15 text-pass', label: 'Healthy' },
@@ -46,10 +47,10 @@ export default function SystemHealthPage() {
       setChainStatus(`Confirm in your wallet to ${isPaused ? 'resume' : 'pause'} validation...`);
       await writeContractAsUser(address, isPaused ? 'unpause' : 'pause', []);
       await refetchPaused();
+      setChainStatus(null);
     } catch (chainErr) {
       console.warn('Pause toggle failed:', chainErr);
-    } finally {
-      setChainStatus(null);
+      setChainStatus(`Pause toggle failed: ${getErrorMessage(chainErr)}`);
     }
   }
 

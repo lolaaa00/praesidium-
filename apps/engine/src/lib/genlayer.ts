@@ -6,48 +6,33 @@ import { logger } from '../config/logger.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _client: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _account: any = null;
 
 /**
- * Get the GenLayer client (singleton).
+ * Get the GenLayer client (singleton, no account bound).
  *
- * This is the engine's own service account, used only for the
- * agent-submitted validate_action path — agents are backend processes with
- * no wallet to sign with, so the engine signs on their behalf. Org/policy/
- * agent management actions a human performs in the dashboard go through the
- * user's own connected wallet instead (see apps/web/src/lib/genlayer).
+ * There's no engine-wide signing account — every agent has its own
+ * GenLayer keypair, decrypted per-call in callContract() below. This
+ * client is only used for the underlying RPC connection.
  */
 export function getGenlayerClient() {
   if (!_client) {
-    _client = createClient({
-      chain: studionet,
-      account: getAccount(),
-    });
+    _client = createClient({ chain: studionet });
   }
   return _client;
 }
 
 /**
- * Get the GenLayer account (singleton) — holds the private key.
- * NEVER expose this outside the engine.
- */
-export function getAccount() {
-  if (!_account) {
-    _account = createAccount(env.GENLAYER_PRIVATE_KEY as `0x${string}`);
-  }
-  return _account;
-}
-
-/**
- * Call a write method on the Intelligent Contract and wait for consensus.
+ * Call a write method on the Intelligent Contract and wait for consensus,
+ * signed by the given agent's own private key (already decrypted —
+ * see apps/engine/src/lib/agent-key.ts).
  */
 export async function callContract(
   method: string,
   args: unknown[],
+  agentPrivateKey: `0x${string}`,
 ): Promise<{ txHash: string; result: unknown }> {
   const client = getGenlayerClient();
-  const account = getAccount();
+  const account = createAccount(agentPrivateKey);
 
   logger.info({ method, contractAddress: env.GENLAYER_CONTRACT_ADDRESS }, 'Submitting GenLayer transaction');
 
@@ -81,6 +66,7 @@ export async function callContract(
 
 /**
  * Read a view method on the Intelligent Contract (no consensus needed).
+ * Reads aren't signed, so any throwaway account works.
  */
 export async function readContract(
   method: string,
@@ -89,7 +75,7 @@ export async function readContract(
   const client = getGenlayerClient();
 
   const result = await client.readContract({
-    account: getAccount(),
+    account: createAccount(),
     address: env.GENLAYER_CONTRACT_ADDRESS,
     functionName: method,
     args,

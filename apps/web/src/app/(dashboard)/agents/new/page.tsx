@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import Link from 'next/link';
 import { ArrowLeft, Bot, Copy, Check, AlertTriangle } from 'lucide-react';
 import { useRegisterAgent } from '@/hooks/queries/use-agents';
 import { useOrgStore } from '@/stores/org-store';
 import { ensureOrgRegisteredOnChain, writeContractAsUser } from '@/lib/genlayer/client';
+import { getErrorMessage } from '@/lib/utils/errors';
 
 const AGENT_TYPES = [
   { value: 'chatbot', label: 'Chatbot', desc: 'Conversational agent that interacts with users' },
@@ -17,7 +17,6 @@ const AGENT_TYPES = [
 ] as const;
 
 export default function RegisterAgentPage() {
-  const router = useRouter();
   const { address } = useAccount();
   const { currentOrgId, currentOrgName } = useOrgStore();
   const registerAgent = useRegisterAgent();
@@ -28,6 +27,7 @@ export default function RegisterAgentPage() {
   const [error, setError] = useState('');
   const [chainStatus, setChainStatus] = useState<string | null>(null);
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
+  const [newAgentAddress, setNewAgentAddress] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -44,6 +44,7 @@ export default function RegisterAgentPage() {
         agentType,
       });
       setNewApiKey(result.apiKey);
+      setNewAgentAddress(result.agent.genlayer_address ?? null);
 
       // Register the agent on-chain, signed by the registering user. Best
       // effort — the agent already works via the engine regardless, since
@@ -60,11 +61,17 @@ export default function RegisterAgentPage() {
             true,
             agentType !== 'chatbot',
           ]);
-        } catch (chainErr) {
-          console.warn('On-chain agent registration skipped:', chainErr);
-        } finally {
           setChainStatus(null);
+        } catch (chainErr) {
+          console.warn('On-chain agent registration failed:', chainErr);
+          setChainStatus(
+            `On-chain registration failed: ${getErrorMessage(chainErr)}. The agent still works via the engine.`,
+          );
         }
+      } else {
+        setChainStatus(
+          `On-chain registration skipped (${!address ? 'no wallet address' : 'no org selected'}). The agent still works via the engine.`,
+        );
       }
     } catch (err) {
       setError((err as Error).message ?? 'Failed to register agent.');
@@ -131,6 +138,20 @@ export default function RegisterAgentPage() {
               </div>
             </div>
           </div>
+
+          {newAgentAddress && (
+            <div className="rounded-xl border border-primary/30 bg-primary/10 p-5">
+              <h2 className="mb-1 font-semibold text-primary">On-chain identity — needs funding</h2>
+              <p className="mb-3 text-sm text-primary/80">
+                This agent signs its own validate_action calls with this address. It needs a small
+                GEN balance on StudioNet to pay gas before its first validation — without funding,
+                the engine falls back to local (off-chain) evaluation for this agent.
+              </p>
+              <code className="block rounded-md bg-primary/15 px-3 py-2.5 font-mono text-sm text-primary break-all">
+                {newAgentAddress}
+              </code>
+            </div>
+          )}
 
           <div className="rounded-xl border bg-card p-5 shadow-sm">
             <h2 className="mb-3 font-semibold">Using the API key</h2>

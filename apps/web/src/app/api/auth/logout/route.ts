@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { clearWalletSessionCookie } from '@/lib/auth/session';
 
 /**
  * POST /api/auth/logout
@@ -7,9 +7,9 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
  */
 export async function POST() {
   try {
-    const supabase = await createServerSupabaseClient();
-    await supabase.auth.signOut();
-    return NextResponse.json({ success: true });
+    const response = NextResponse.json({ success: true });
+    response.cookies.set(clearWalletSessionCookie());
+    return response;
   } catch {
     return NextResponse.json({ success: true });
   }

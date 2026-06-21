@@ -9,9 +9,13 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
 
   // GenLayer
-  GENLAYER_PRIVATE_KEY: z.string().min(1),
+  // No shared engine-wide signing key anymore — every agent has its own
+  // GenLayer keypair (generated at registration, encrypted at rest with
+  // AGENT_KEY_ENCRYPTION_SECRET below) and signs its own validate_action
+  // calls. See apps/engine/src/lib/agent-key.ts.
   GENLAYER_CONTRACT_ADDRESS: z.string().default(''),
   GENLAYER_RPC_URL: z.string().url().default('https://studio.genlayer.com/api'),
+  AGENT_KEY_ENCRYPTION_SECRET: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

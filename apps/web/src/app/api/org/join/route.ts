@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { cookies } from 'next/headers';
+import { SESSION_COOKIE_NAME } from '@/lib/utils/constants';
+import { verifyWalletSessionToken } from '@/lib/auth/session';
+
+async function getSessionUser() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const session = token ? verifyWalletSessionToken(token) : null;
+  return session ? { id: session.userId, walletAddress: session.walletAddress } : null;
+}
 
 // ──────────────────────────────────────────
 // POST /api/org/join — Join an organization by slug
@@ -16,12 +25,24 @@ const joinOrgSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
+  const walletAddress = request.headers.get('x-wallet-address')?.trim().toLowerCase() ?? null;
+  const admin = createAdminClient();
 
-  if (!user) {
+  let resolvedUser = user;
+  if (!resolvedUser && walletAddress) {
+    const { data: profile } = await admin
+      .from('user_profiles')
+      .select('id, wallet_address')
+      .eq('wallet_address', walletAddress)
+      .maybeSingle();
+
+    if (profile) {
+      resolvedUser = { id: profile.id, walletAddress: profile.wallet_address };
+    }
+  }
+
+  if (!resolvedUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -39,8 +60,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const admin = createAdminClient();
-
   // Find org by slug
   const { data: org, error: orgError } = await admin
     .from('organizations')
@@ -57,7 +76,7 @@ export async function POST(request: NextRequest) {
     .from('org_members')
     .select('id')
     .eq('org_id', org.id)
-    .eq('user_id', user.id)
+    .eq('user_id', resolvedUser.id)
     .maybeSingle();
 
   if (existing) {
@@ -70,7 +89,7 @@ export async function POST(request: NextRequest) {
   // Add user as member
   const { error: memberError } = await admin.from('org_members').insert({
     org_id: org.id,
-    user_id: user.id,
+    user_id: resolvedUser.id,
     role: 'member',
     invited_by: null,
   });
@@ -83,10 +102,10 @@ export async function POST(request: NextRequest) {
   // Audit log
   await admin.from('audit_logs').insert({
     org_id: org.id,
-    user_id: user.id,
+    user_id: resolvedUser.id,
     action: 'member_invited',
     resource_type: 'org_member',
-    resource_id: user.id,
+    resource_id: resolvedUser.id,
     details: { method: 'self_join', slug: body.slug },
   });
 

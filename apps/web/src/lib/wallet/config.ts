@@ -1,6 +1,6 @@
 import { http, createConfig } from 'wagmi';
 import { mainnet } from 'wagmi/chains';
-import { injected } from 'wagmi/connectors';
+import { injected } from 'wagmi';
 
 /**
  * wagmi configuration with injected wallet connector.

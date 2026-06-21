@@ -1,5 +1,5 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { SESSION_COOKIE_NAME } from '@/lib/utils/constants';
 
 /**
  * Refreshes the Supabase auth session on every request.
@@ -7,33 +7,11 @@ import { NextResponse, type NextRequest } from 'next/server';
  * Returns { supabase, response } — pass response through.
  */
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  const supabaseResponse = NextResponse.next({ request });
+  const session = request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          );
-        },
-      },
-    },
-  );
-
-  // Refresh the session — this keeps it alive
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  return { user, supabaseResponse };
+  return {
+    user: session ? { id: 'wallet-session' } : null,
+    supabaseResponse,
+  };
 }

@@ -1,4 +1,5 @@
 import { useOrgStore } from '@/stores/org-store';
+import { useAuthStore } from '@/stores/auth-store';
 
 /**
  * Org-aware fetch wrapper.
@@ -9,6 +10,7 @@ export async function orgFetch(
   options: RequestInit = {},
 ): Promise<Response> {
   const orgId = useOrgStore.getState().currentOrgId;
+  const walletAddress = useAuthStore.getState().user?.walletAddress;
 
   if (!orgId) {
     throw new Error('No organization selected');
@@ -16,6 +18,9 @@ export async function orgFetch(
 
   const headers = new Headers(options.headers);
   headers.set('x-org-id', orgId);
+  if (walletAddress) {
+    headers.set('x-wallet-address', walletAddress);
+  }
 
   if (options.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');

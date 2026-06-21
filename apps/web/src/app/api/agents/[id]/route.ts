@@ -5,6 +5,10 @@ import { requireAuth, isAuthError } from '@/lib/api/auth-check';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+// Deliberately excludes genlayer_key_ciphertext — see apps/web/src/app/api/agents/route.ts.
+const AGENT_PUBLIC_COLUMNS =
+  'id, org_id, name, description, agent_type, status, api_key_hash, api_key_prefix, metadata, last_seen_at, registered_by, created_at, updated_at, genlayer_address' as const;
+
 // ──────────────────────────────────────────
 // GET /api/agents/[id] — Get a single agent with permissions
 // ──────────────────────────────────────────
@@ -18,7 +22,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   const { data: agent, error } = await supabase
     .from('agents')
-    .select('*, agent_permissions(*)')
+    .select(`${AGENT_PUBLIC_COLUMNS}, agent_permissions(*)`)
     .eq('id', id)
     .eq('org_id', orgId)
     .maybeSingle();
@@ -100,7 +104,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     .update(updates)
     .eq('id', id)
     .eq('org_id', orgId)
-    .select()
+    .select(AGENT_PUBLIC_COLUMNS)
     .single();
 
   if (error) {
@@ -153,7 +157,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     .update({ status: 'revoked' })
     .eq('id', id)
     .eq('org_id', orgId)
-    .select()
+    .select(AGENT_PUBLIC_COLUMNS)
     .single();
 
   if (error) {

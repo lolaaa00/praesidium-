@@ -28,6 +28,7 @@ import {
 } from '@/hooks/queries/use-policies';
 import { useOrgStore } from '@/stores/org-store';
 import { ensureOrgRegisteredOnChain, writeContractAsUser, hashText } from '@/lib/genlayer/client';
+import { getErrorMessage } from '@/lib/utils/errors';
 
 const SEVERITY_BADGE: Record<string, string> = {
   low: 'bg-cornflower/15 text-maxblue-2',
@@ -143,11 +144,17 @@ export default function PolicyDetailPage({
           // feature shipped) — register it now with the real hash instead.
           await writeContractAsUser(address, 'register_policy', [id, policy.org_id, policy.name, rulesHash]);
         }
-      } catch (chainErr) {
-        console.warn('On-chain rules hash commit skipped:', chainErr);
-      } finally {
         setChainStatus(null);
+      } catch (chainErr) {
+        console.warn('On-chain rules hash commit failed:', chainErr);
+        setChainStatus(
+          `On-chain rules hash commit failed: ${getErrorMessage(chainErr)}`,
+        );
       }
+    } else {
+      setChainStatus(
+        `On-chain rules hash commit skipped (${!address ? 'no wallet address' : 'policy not loaded'}).`,
+      );
     }
   }
 

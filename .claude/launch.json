@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web (Next.js)",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@praesidium/web", "dev"],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "engine (Express)",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@praesidium/engine", "dev"],
+      "port": 3001,
+      "autoPort": true
+    },
+    {
+      "name": "shared (tsc --watch)",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@praesidium/shared", "dev"],
+      "port": null
+    }
+  ]
+}

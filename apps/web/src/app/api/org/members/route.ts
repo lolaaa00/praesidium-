@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth, isAuthError } from '@/lib/api/auth-check';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { normalizeWalletAddress } from '@/lib/utils/wallet';
 
 // ──────────────────────────────────────────
 // GET /api/org/members — List org members
@@ -69,12 +70,14 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
+  const normalizedWalletAddress = normalizeWalletAddress(body.walletAddress);
 
   // Find user by wallet address
   const { data: profile } = await admin
     .from('user_profiles')
     .select('id')
-    .eq('wallet_address', body.walletAddress.toLowerCase())
+    .ilike('wallet_address', normalizedWalletAddress)
+    .limit(1)
     .maybeSingle();
 
   if (!profile) {

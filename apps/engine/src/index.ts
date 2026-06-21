@@ -34,7 +34,8 @@ app.use(validateRouter);
 app.use(errorHandler);
 
 // ── Start ──
-app.listen(env.PORT, () => {
+// Bind to loopback in local dev so the engine can run inside restricted environments.
+app.listen(env.PORT, '127.0.0.1', () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, 'Praesidium Validation Engine started');
 });
 

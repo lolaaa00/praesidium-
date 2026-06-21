@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import type { SupabaseClient, User } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { SESSION_COOKIE_NAME } from '@/lib/utils/constants';
+import { verifyWalletSessionToken } from '@/lib/auth/session';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface AuthResult {
-  user: User;
+  user: {
+    id: string;
+    walletAddress: string;
+  };
   supabase: SupabaseClient;
   orgId: string;
   role: string;
@@ -19,12 +24,26 @@ interface AuthResult {
 export async function requireAuth(
   headers: Headers,
 ): Promise<AuthResult | NextResponse> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const admin = createAdminClient();
+  const cookieHeader = headers.get('cookie') ?? '';
+  const sessionMatch = cookieHeader.match(new RegExp(`${SESSION_COOKIE_NAME}=([^;]+)`));
+  const sessionToken = sessionMatch?.[1] ? decodeURIComponent(sessionMatch[1]) : null;
+  const session = sessionToken ? verifyWalletSessionToken(sessionToken) : null;
+  const walletAddress = headers.get('x-wallet-address')?.trim().toLowerCase() ?? null;
 
-  if (!user) {
+  let userId = session?.userId ?? null;
+
+  if (!userId && walletAddress) {
+    const { data: profile } = await admin
+      .from('user_profiles')
+      .select('id')
+      .eq('wallet_address', walletAddress)
+      .maybeSingle();
+
+    userId = profile?.id ?? null;
+  }
+
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -37,18 +56,26 @@ export async function requireAuth(
   }
 
   // Verify membership
-  const { data: membership } = await supabase
+  const { data: membership } = await admin
     .from('org_members')
     .select('role')
     .eq('org_id', orgId)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .maybeSingle();
 
   if (!membership) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  return { user, supabase, orgId, role: membership.role };
+  return {
+    user: {
+      id: userId,
+      walletAddress: session?.walletAddress ?? walletAddress ?? '',
+    },
+    supabase: admin,
+    orgId,
+    role: membership.role,
+  };
 }
 
 /**

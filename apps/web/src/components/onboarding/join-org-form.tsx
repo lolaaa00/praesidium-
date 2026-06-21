@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAccount } from 'wagmi';
 import { Users, Loader2, ArrowLeft } from 'lucide-react';
 import { useOrgStore } from '@/stores/org-store';
 
@@ -11,6 +12,7 @@ interface JoinOrgFormProps {
 
 export function JoinOrgForm({ onBack }: JoinOrgFormProps) {
   const router = useRouter();
+  const { address } = useAccount();
   const { setCurrentOrg } = useOrgStore();
   const [slug, setSlug] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +29,10 @@ export function JoinOrgForm({ onBack }: JoinOrgFormProps) {
     try {
       const res = await fetch('/api/org/join', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(address ? { 'x-wallet-address': address } : {}),
+        },
         body: JSON.stringify({ slug: cleanSlug }),
       });
 

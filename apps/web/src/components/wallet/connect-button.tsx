@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { useAuth } from '@/hooks/use-auth';
+import { useAuthStore } from '@/stores/auth-store';
 import { truncateAddress } from '@/lib/utils/formatting';
 
 /**
@@ -10,10 +12,23 @@ import { truncateAddress } from '@/lib/utils/formatting';
  * States: disconnected → connecting → connected (not signed) → signing → authenticated
  */
 export function ConnectButton() {
+  const router = useRouter();
   const { isConnected, address } = useAccount();
   const { isAuthenticated, isLoading, connectWallet, signIn } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // isAuthenticated can become true from loadSession() finding an existing
+  // valid cookie on mount (e.g. you reload /connect while already signed
+  // in), not just from the signIn() flow below — and that path never calls
+  // router.push(), so without this effect you'd be stuck on this page
+  // showing "Redirecting..." forever.
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    const hasOrg = user.memberships.length > 0;
+    router.push(hasOrg ? '/overview' : '/onboarding');
+  }, [isAuthenticated, user, router]);
 
   const handleConnect = async () => {
     try {

@@ -19,6 +19,7 @@ import { useAgent, useUpdateAgent, useRevokeAgent } from '@/hooks/queries/use-ag
 import { useValidations } from '@/hooks/queries/use-validations';
 import { useOrgStore } from '@/stores/org-store';
 import { ensureOrgRegisteredOnChain, writeContractAsUser } from '@/lib/genlayer/client';
+import { getErrorMessage } from '@/lib/utils/errors';
 
 const TYPE_LABEL: Record<string, string> = {
   chatbot: 'Chatbot',
@@ -77,8 +78,8 @@ export default function AgentDetailPage({
   // Calls the on-chain status-change method, registering the agent first
   // if it predates on-chain registration. Best effort — Supabase is always
   // updated regardless of whether this succeeds.
-  async function syncAgentStatusOnChain(targetStatus: 'active' | 'suspended' | 'revoked') {
-    if (!address || !agent) return;
+  async function syncAgentStatusOnChain(targetStatus: 'active' | 'suspended' | 'revoked'): Promise<boolean> {
+    if (!address || !agent) return true;
     const method =
       targetStatus === 'active' ? 'reinstate_agent' : targetStatus === 'suspended' ? 'suspend_agent' : 'revoke_agent';
     try {
@@ -99,10 +100,14 @@ export default function AgentDetailPage({
           await writeContractAsUser(address, method, [id]);
         }
       }
-    } catch (chainErr) {
-      console.warn('On-chain agent status sync skipped:', chainErr);
-    } finally {
       setChainStatus(null);
+      return true;
+    } catch (chainErr) {
+      console.warn('On-chain agent status sync failed:', chainErr);
+      setChainStatus(
+        `On-chain ${method.replace('_', ' ')} failed: ${getErrorMessage(chainErr)}`,
+      );
+      return false;
     }
   }
 
@@ -114,8 +119,10 @@ export default function AgentDetailPage({
 
   async function handleRevoke() {
     await revokeAgent.mutateAsync(id);
-    await syncAgentStatusOnChain('revoked');
-    router.push('/agents');
+    const chainOk = await syncAgentStatusOnChain('revoked');
+    if (chainOk) {
+      router.push('/agents');
+    }
   }
 
   async function copyKey() {
@@ -295,6 +302,13 @@ export default function AgentDetailPage({
           {
             label: 'Validations',
             value: String(vData?.pagination?.total ?? '—'),
+          },
+          {
+            label: 'On-Chain Address',
+            value: agent.genlayer_address
+              ? `${agent.genlayer_address.slice(0, 8)}…${agent.genlayer_address.slice(-6)}`
+              : 'Not assigned',
+            mono: true,
           },
         ].map(({ label, value, mono }) => (
           <div key={label} className="rounded-lg border bg-card p-4">

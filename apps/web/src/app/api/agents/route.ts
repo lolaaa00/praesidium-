@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { randomBytes, createHash } from 'crypto';
+import { generatePrivateKey, createAccount } from 'genlayer-js';
 import { requireAuth, isAuthError } from '@/lib/api/auth-check';
+import { encryptAgentKey } from '@/lib/crypto/agent-key';
+
+// Deliberately excludes genlayer_key_ciphertext — the encrypted private key
+// must never reach the browser, even encrypted. genlayer_address (its public
+// counterpart) is fine to expose; it's shown in the UI so an org owner knows
+// what address to fund with GEN. Supabase's select() needs an inline string
+// literal to infer types, so this can't be a shared constant.
+const AGENT_PUBLIC_COLUMNS =
+  'id, org_id, name, description, agent_type, status, api_key_hash, api_key_prefix, metadata, last_seen_at, registered_by, created_at, updated_at, genlayer_address' as const;
 
 // ──────────────────────────────────────────
 // GET /api/agents — List agents for the current org
@@ -22,7 +32,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from('agents')
-    .select('*', { count: 'exact' })
+    .select(AGENT_PUBLIC_COLUMNS, { count: 'exact' })
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -95,6 +105,13 @@ export async function POST(request: NextRequest) {
 
   const { rawKey, prefix, hash } = generateApiKey();
 
+  // Every agent gets its own GenLayer keypair, used by the engine to sign
+  // that agent's own validate_action calls — no shared engine-wide signing
+  // key. The private key is encrypted at rest and never returned here.
+  const genlayerPrivateKey = generatePrivateKey();
+  const genlayerAddress = createAccount(genlayerPrivateKey).address;
+  const genlayerKeyCiphertext = encryptAgentKey(genlayerPrivateKey);
+
   const { data: agent, error } = await supabase
     .from('agents')
     .insert({
@@ -107,8 +124,10 @@ export async function POST(request: NextRequest) {
       api_key_prefix: prefix,
       metadata: body.metadata,
       registered_by: user.id,
+      genlayer_address: genlayerAddress,
+      genlayer_key_ciphertext: genlayerKeyCiphertext,
     })
-    .select()
+    .select(AGENT_PUBLIC_COLUMNS)
     .single();
 
   if (error) {

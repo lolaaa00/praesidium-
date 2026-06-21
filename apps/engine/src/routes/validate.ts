@@ -74,6 +74,7 @@ router.post(
         requestId: result.requestId,
         verdict: result.verdict,
         complianceScore: result.complianceScore,
+        riskScore: result.riskScore,
         reasoning: result.reasoning,
         violations: result.violations,
         consensus: {

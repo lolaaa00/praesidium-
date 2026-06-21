@@ -8,6 +8,7 @@ import { ArrowLeft, Shield } from 'lucide-react';
 import { useCreatePolicy } from '@/hooks/queries/use-policies';
 import { useOrgStore } from '@/stores/org-store';
 import { ensureOrgRegisteredOnChain, writeContractAsUser, hashText } from '@/lib/genlayer/client';
+import { getErrorMessage } from '@/lib/utils/errors';
 
 export default function NewPolicyPage() {
   const router = useRouter();
@@ -19,6 +20,8 @@ export default function NewPolicyPage() {
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
   const [chainStatus, setChainStatus] = useState<string | null>(null);
+  const [chainError, setChainError] = useState<string | null>(null);
+  const [createdPolicyId, setCreatedPolicyId] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,10 +50,13 @@ export default function NewPolicyPage() {
             name.trim(),
             placeholderHash,
           ]);
-        } catch (chainErr) {
-          console.warn('On-chain policy registration skipped:', chainErr);
-        } finally {
           setChainStatus(null);
+        } catch (chainErr) {
+          console.warn('On-chain policy registration failed:', chainErr);
+          setChainStatus(null);
+          setChainError(getErrorMessage(chainErr));
+          setCreatedPolicyId(result.policy.id);
+          return;
         }
       }
 
@@ -113,6 +119,19 @@ export default function NewPolicyPage() {
           {chainStatus && (
             <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
               {chainStatus}
+            </div>
+          )}
+
+          {chainError && createdPolicyId && (
+            <div className="space-y-2 rounded-md bg-fail/10 border border-fail/30 px-4 py-3 text-sm text-fail">
+              <p>On-chain policy registration failed: {chainError}</p>
+              <button
+                type="button"
+                onClick={() => router.push(`/policies/${createdPolicyId}`)}
+                className="rounded-md border border-fail/30 px-3 py-1 text-xs font-medium hover:bg-fail/10 transition-colors"
+              >
+                Continue anyway — the policy still exists, retry the on-chain step from its detail page
+              </button>
             </div>
           )}
 

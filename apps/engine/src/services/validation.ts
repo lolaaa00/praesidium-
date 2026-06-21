@@ -1,5 +1,6 @@
 import { getSupabase } from '../lib/supabase.js';
 import { callContract } from '../lib/genlayer.js';
+import { decryptAgentKey } from '../lib/agent-key.js';
 import { logger } from '../config/logger.js';
 
 export interface ValidateInput {
@@ -15,6 +16,7 @@ export interface ValidationOutput {
   requestId: string;
   verdict: string;
   complianceScore: number;
+  riskScore: number;
   reasoning: string;
   violations: Array<{
     ruleName: string;
@@ -27,8 +29,8 @@ export interface ValidationOutput {
 
 /**
  * Full validation pipeline:
- * 1. Create validation_request in Supabase (status: pending)
- * 2. Load policy + rules
+ * 1. Load policy + rules (also gives us the version to stamp on the request)
+ * 2. Create validation_request in Supabase (status: pending)
  * 3. Submit to GenLayer Intelligent Contract for consensus
  * 4. Parse result, write validation_result + violations
  * 5. Update validation_request status
@@ -37,13 +39,32 @@ export async function runValidation(input: ValidateInput): Promise<ValidationOut
   const supabase = getSupabase();
   const { agentId, orgId, policyId, actionType, actionPayload, context } = input;
 
-  // 1. Create validation request
+  // 1. Load policy + rules
+  const { data: policy } = await supabase
+    .from('policies')
+    .select('*, policy_rules(*)')
+    .eq('id', policyId)
+    .eq('org_id', orgId)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (!policy) {
+    throw new Error('Policy not found or not active');
+  }
+
+  const rules = policy.policy_rules || [];
+  if (rules.length === 0) {
+    throw new Error('Policy has no rules');
+  }
+
+  // 2. Create validation request
   const { data: request, error: reqError } = await supabase
     .from('validation_requests')
     .insert({
       org_id: orgId,
       agent_id: agentId,
       policy_id: policyId,
+      policy_version: policy.version,
       action_type: actionType,
       action_payload: actionPayload,
       context: context || {},
@@ -60,26 +81,6 @@ export async function runValidation(input: ValidateInput): Promise<ValidationOut
   logger.info({ requestId, agentId, policyId, actionType }, 'Validation request created');
 
   try {
-    // 2. Load policy + rules
-    const { data: policy } = await supabase
-      .from('policies')
-      .select('*, policy_rules(*)')
-      .eq('id', policyId)
-      .eq('org_id', orgId)
-      .eq('status', 'active')
-      .maybeSingle();
-
-    if (!policy) {
-      await updateRequestStatus(requestId, 'failed');
-      throw new Error('Policy not found or not active');
-    }
-
-    const rules = policy.policy_rules || [];
-    if (rules.length === 0) {
-      await updateRequestStatus(requestId, 'failed');
-      throw new Error('Policy has no rules');
-    }
-
     // Mark as processing
     await updateRequestStatus(requestId, 'processing');
 
@@ -100,23 +101,36 @@ export async function runValidation(input: ValidateInput): Promise<ValidationOut
       context: context || {},
     });
 
-    // 4. Submit to GenLayer
+    // 4. Submit to GenLayer, signed with this agent's own key
     let txHash: string | null = null;
     let consensusResult: unknown = null;
 
     try {
-      const genlayerResult = await callContract('validate_action', [
-        requestId,
-        agentId,
-        validationPrompt,
-      ]);
+      const { data: agentRow } = await supabase
+        .from('agents')
+        .select('genlayer_key_ciphertext')
+        .eq('id', agentId)
+        .maybeSingle();
+
+      if (!agentRow?.genlayer_key_ciphertext) {
+        throw new Error('Agent has no on-chain identity (registered before per-agent keys shipped).');
+      }
+
+      const agentPrivateKey = decryptAgentKey(agentRow.genlayer_key_ciphertext) as `0x${string}`;
+
+      const genlayerResult = await callContract(
+        'validate_action',
+        [requestId, agentId, validationPrompt],
+        agentPrivateKey,
+      );
 
       txHash = genlayerResult.txHash;
       consensusResult = genlayerResult.result;
 
       logger.info({ requestId, txHash }, 'GenLayer consensus completed');
     } catch (glError) {
-      // GenLayer might be unavailable — fall back to local evaluation
+      // GenLayer might be unavailable, or the agent has no key yet — fall
+      // back to local evaluation rather than blocking the agent entirely.
       logger.warn(
         { requestId, error: (glError as Error).message },
         'GenLayer unavailable, falling back to local evaluation',
@@ -136,6 +150,7 @@ export async function runValidation(input: ValidateInput): Promise<ValidationOut
         request_id: requestId,
         verdict: parsed.verdict,
         compliance_score: parsed.complianceScore,
+        risk_score: parsed.riskScore,
         reasoning: parsed.reasoning,
         consensus_data: {
           txHash,
@@ -195,6 +210,7 @@ export async function runValidation(input: ValidateInput): Promise<ValidationOut
       requestId,
       verdict: parsed.verdict,
       complianceScore: parsed.complianceScore,
+      riskScore: parsed.riskScore,
       reasoning: parsed.reasoning,
       violations: parsed.violations,
       txHash,
@@ -223,12 +239,16 @@ export async function runValidation(input: ValidateInput): Promise<ValidationOut
 
 async function updateRequestStatus(requestId: string, status: string): Promise<void> {
   const supabase = getSupabase();
-  await supabase.from('validation_requests').update({ status }).eq('id', requestId);
+  const { error } = await supabase.from('validation_requests').update({ status }).eq('id', requestId);
+  if (error) {
+    logger.error({ requestId, status, error: error.message }, 'Failed to update validation request status');
+  }
 }
 
 interface ParsedResult {
   verdict: string;
   complianceScore: number;
+  riskScore: number;
   reasoning: string;
   violations: Array<{ ruleName: string; severity: string; description: string }>;
 }
@@ -238,6 +258,7 @@ function parseConsensusResult(raw: unknown): ParsedResult {
   const defaultResult: ParsedResult = {
     verdict: 'approved',
     complianceScore: 100,
+    riskScore: 0,
     reasoning: 'No issues detected',
     violations: [],
   };
@@ -250,6 +271,7 @@ function parseConsensusResult(raw: unknown): ParsedResult {
     // The GenLayer contract should return a structured result
     const verdict = typeof data.verdict === 'string' ? data.verdict : 'approved';
     const score = typeof data.compliance_score === 'number' ? data.compliance_score : 100;
+    const riskScore = typeof data.risk_score === 'number' ? data.risk_score : 100 - score;
     const reasoning = typeof data.reasoning === 'string' ? data.reasoning : 'No issues detected';
 
     const violations: ParsedResult['violations'] = [];
@@ -266,7 +288,7 @@ function parseConsensusResult(raw: unknown): ParsedResult {
       }
     }
 
-    return { verdict, complianceScore: score, reasoning, violations };
+    return { verdict, complianceScore: score, riskScore, reasoning, violations };
   } catch {
     return defaultResult;
   }
@@ -311,6 +333,7 @@ function localEvaluation(
   return {
     verdict: hasCritical ? 'escalated' : hasHigh ? 'conditional' : 'approved',
     compliance_score: hasCritical ? 30 : hasHigh ? 60 : 85,
+    risk_score: hasCritical ? 70 : hasHigh ? 40 : 15,
     reasoning: violations.length > 0
       ? `Local evaluation: ${violations.length} applicable rule(s) found. GenLayer unavailable for consensus — ${hasCritical ? 'escalating' : 'conditionally approved'}.`
       : 'No applicable rules for this action type.',

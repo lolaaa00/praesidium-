@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       { count: 'exact' },
     )
     .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
+    .order('submitted_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (status && ['pending', 'processing', 'completed', 'failed', 'timeout'].includes(status)) {

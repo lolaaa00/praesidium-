@@ -1,27 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { cookies } from 'next/headers';
+import { SESSION_COOKIE_NAME } from '@/lib/utils/constants';
+import { verifyWalletSessionToken } from '@/lib/auth/session';
+
+async function getSessionUser() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const session = token ? verifyWalletSessionToken(token) : null;
+  if (session) {
+    return { id: session.userId, walletAddress: session.walletAddress };
+  }
+
+  // Fallback for local development when the client already knows the wallet
+  // address but the cookie session is unavailable.
+  return null;
+}
 
 // ──────────────────────────────────────────
 // GET /api/org — Get current user's organization
 // ──────────────────────────────────────────
 
-export async function GET() {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function GET(request: NextRequest) {
+  const user = await getSessionUser();
+  const walletAddress = request.headers.get('x-wallet-address')?.trim().toLowerCase() ?? null;
+  const admin = createAdminClient();
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  let resolvedUser = user;
+  if (!resolvedUser && walletAddress) {
+    const { data: profile } = await admin
+      .from('user_profiles')
+      .select('id, wallet_address')
+      .eq('wallet_address', walletAddress)
+      .maybeSingle();
+
+    if (profile) {
+      resolvedUser = { id: profile.id, walletAddress: profile.wallet_address };
+    }
   }
 
+  if (!resolvedUser) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   // Get user's org memberships with org details
-  const { data: memberships, error } = await supabase
+  const { data: memberships, error } = await admin
     .from('org_members')
     .select('*, organization:organizations(*)')
-    .eq('user_id', user.id);
+    .eq('user_id', resolvedUser.id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -43,12 +69,24 @@ const createOrgSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
+  const walletAddress = request.headers.get('x-wallet-address')?.trim().toLowerCase() ?? null;
+  const admin = createAdminClient();
 
-  if (!user) {
+  let resolvedUser = user;
+  if (!resolvedUser && walletAddress) {
+    const { data: profile } = await admin
+      .from('user_profiles')
+      .select('id, wallet_address')
+      .eq('wallet_address', walletAddress)
+      .maybeSingle();
+
+    if (profile) {
+      resolvedUser = { id: profile.id, walletAddress: profile.wallet_address };
+    }
+  }
+
+  if (!resolvedUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -75,8 +113,6 @@ export async function POST(request: NextRequest) {
     .slice(0, 60);
 
   // Use admin client to bypass RLS for org creation
-  const admin = createAdminClient();
-
   // Check slug uniqueness
   const { data: existing } = await admin
     .from('organizations')
@@ -98,7 +134,7 @@ export async function POST(request: NextRequest) {
       name: body.name,
       slug,
       description: body.description || null,
-      created_by: user.id,
+      created_by: resolvedUser.id,
       settings: {},
     })
     .select()
@@ -112,7 +148,7 @@ export async function POST(request: NextRequest) {
   // Add creator as owner
   const { error: memberError } = await admin.from('org_members').insert({
     org_id: org.id,
-    user_id: user.id,
+    user_id: resolvedUser.id,
     role: 'owner',
     invited_by: null,
   });
@@ -127,7 +163,7 @@ export async function POST(request: NextRequest) {
   // Write audit log
   await admin.from('audit_logs').insert({
     org_id: org.id,
-    user_id: user.id,
+    user_id: resolvedUser.id,
     action: 'org_created',
     resource_type: 'organization',
     resource_id: org.id,
@@ -159,12 +195,24 @@ const updateOrgSchema = z.object({
 });
 
 export async function PUT(request: NextRequest) {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
+  const walletAddress = request.headers.get('x-wallet-address')?.trim().toLowerCase() ?? null;
+  const admin = createAdminClient();
 
-  if (!user) {
+  let resolvedUser = user;
+  if (!resolvedUser && walletAddress) {
+    const { data: profile } = await admin
+      .from('user_profiles')
+      .select('id, wallet_address')
+      .eq('wallet_address', walletAddress)
+      .maybeSingle();
+
+    if (profile) {
+      resolvedUser = { id: profile.id, walletAddress: profile.wallet_address };
+    }
+  }
+
+  if (!resolvedUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -183,11 +231,11 @@ export async function PUT(request: NextRequest) {
   }
 
   // Check user is admin/owner of this org
-  const { data: membership } = await supabase
+  const { data: membership } = await admin
     .from('org_members')
     .select('role')
     .eq('org_id', body.orgId)
-    .eq('user_id', user.id)
+    .eq('user_id', resolvedUser.id)
     .maybeSingle();
 
   if (!membership || !['owner', 'admin'].includes(membership.role)) {
@@ -198,7 +246,7 @@ export async function PUT(request: NextRequest) {
   if (body.name) updates.name = body.name;
   if (body.description !== undefined) updates.description = body.description;
 
-  const { data: org, error } = await supabase
+  const { data: org, error } = await admin
     .from('organizations')
     .update(updates)
     .eq('id', body.orgId)

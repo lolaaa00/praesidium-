@@ -21,6 +21,7 @@ interface AgentRow {
   registered_by: string;
   created_at: string;
   updated_at: string;
+  genlayer_address: string | null;
 }
 
 interface PermissionRow {

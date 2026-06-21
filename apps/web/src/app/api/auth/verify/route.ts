@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyMessage } from 'viem';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SIGN_MESSAGE_PREFIX } from '@/lib/utils/constants';
+import { normalizeWalletAddress } from '@/lib/utils/wallet';
+import { createWalletSessionCookie } from '@/lib/auth/session';
 
 /**
  * POST /api/auth/verify
@@ -48,64 +50,71 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Normalize the address
-    const normalizedAddress = address.toLowerCase();
+    const normalizedAddress = normalizeWalletAddress(address);
     const adminClient = createAdminClient();
 
     // 4. Find or create user_profile
+    // Use a case-insensitive lookup so older mixed-case records still match.
     const { data: existingProfile } = await adminClient
       .from('user_profiles')
-      .select('id')
-      .eq('wallet_address', normalizedAddress)
-      .single();
+      .select('id, wallet_address')
+      .ilike('wallet_address', normalizedAddress)
+      .limit(1)
+      .maybeSingle();
 
     let userId: string;
     let isNewUser = false;
 
     if (existingProfile) {
       userId = existingProfile.id;
+      if (existingProfile.wallet_address !== normalizedAddress) {
+        await adminClient
+          .from('user_profiles')
+          .update({ wallet_address: normalizedAddress })
+          .eq('id', userId);
+      }
     } else {
       const { data: newProfile, error: profileError } = await adminClient
         .from('user_profiles')
         .insert({ wallet_address: normalizedAddress })
         .select('id')
-        .single();
+        .maybeSingle();
 
       if (profileError || !newProfile) {
-        console.error('Failed to create user profile:', profileError);
-        return NextResponse.json({ error: 'Failed to create user account' }, { status: 500 });
+        // A concurrent login or a legacy mixed-case record can still leave a
+        // matching profile in the database. Re-read before failing hard.
+        const { data: fallbackProfile } = await adminClient
+          .from('user_profiles')
+          .select('id')
+          .ilike('wallet_address', normalizedAddress)
+          .limit(1)
+          .maybeSingle();
+
+        if (!fallbackProfile) {
+          console.error('Failed to create user profile:', profileError);
+          return NextResponse.json({ error: 'Failed to create user account' }, { status: 500 });
+        }
+
+        userId = fallbackProfile.id;
+      } else {
+        userId = newProfile.id;
+        isNewUser = true;
       }
-      userId = newProfile.id;
-      isNewUser = true;
     }
 
-    // 5. Find or create Supabase auth user
+    // 5. Generate a magic link session and let Supabase create/reuse the auth user.
+    // The extra metadata keeps our session route aligned with the wallet profile.
     const fakeEmail = `${normalizedAddress}@wallet.praesidium.app`;
 
-    const { data: authList } = await adminClient.auth.admin.listUsers();
-    let authUser = authList?.users?.find((u) => u.email === fakeEmail);
-
-    if (!authUser) {
-      const { data: created, error: authError } = await adminClient.auth.admin.createUser({
-        email: fakeEmail,
-        password: `wallet_${normalizedAddress}_${Date.now()}_${Math.random()}`,
-        email_confirm: true,
-        user_metadata: {
-          wallet_address: normalizedAddress,
-          user_profile_id: userId,
-        },
-      });
-
-      if (authError || !created.user) {
-        console.error('Failed to create auth user:', authError);
-        return NextResponse.json({ error: 'Failed to create auth session' }, { status: 500 });
-      }
-      authUser = created.user;
-    }
-
-    // 6. Generate session link
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: 'magiclink',
       email: fakeEmail,
+      options: {
+        data: {
+          wallet_address: normalizedAddress,
+          user_profile_id: userId,
+        },
+      },
     });
 
     if (linkError || !linkData) {
@@ -113,7 +122,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
     }
 
-    // 7. Check org membership
+    if (linkData.user?.id) {
+      const { error: updateError } = await adminClient.auth.admin.updateUserById(linkData.user.id, {
+        user_metadata: {
+          wallet_address: normalizedAddress,
+          user_profile_id: userId,
+        },
+      });
+
+      if (updateError) {
+        console.error('Failed to refresh auth user metadata:', updateError);
+      }
+    }
+
+    // 6. Check org membership
     const { data: memberships } = await adminClient
       .from('org_members')
       .select('org_id')
@@ -121,7 +143,7 @@ export async function POST(request: NextRequest) {
 
     const hasOrg = memberships != null && memberships.length > 0;
 
-    // 8. Respond with token hash for client-side OTP verification
+    // 7. Respond with token hash for client-side OTP verification
     const response = NextResponse.json({
       success: true,
       userId,
@@ -131,6 +153,14 @@ export async function POST(request: NextRequest) {
       email: fakeEmail,
       tokenHash: linkData.properties?.hashed_token,
     });
+
+    response.cookies.set(
+      createWalletSessionCookie({
+        userId,
+        walletAddress: normalizedAddress,
+        createdAt: Date.now(),
+      }),
+    );
 
     // Clear nonce (single-use)
     response.cookies.set('auth_nonce', '', {
