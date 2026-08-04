@@ -6,6 +6,22 @@ import { normalizeWalletAddress } from '@/lib/utils/wallet';
 import { createWalletSessionCookie } from '@/lib/auth/session';
 
 /**
+ * Some injected wallets (OKX Wallet among them) return personal_sign
+ * signatures whose final `v` byte isn't normalized to viem's expected
+ * {0, 1, 27, 28} — e.g. raw parity values, or v with a chain-id offset
+ * from a signing path shared with typed transactions. viem's
+ * recoverPublicKey throws "Invalid yParityOrV value" on anything else, so
+ * fold whatever we got back down to a valid v via its parity bit.
+ */
+function normalizeSignatureV(signature: `0x${string}`): `0x${string}` {
+  if (signature.length !== 132) return signature;
+  const vByte = Number.parseInt(signature.slice(130, 132), 16);
+  if ([0, 1, 27, 28].includes(vByte)) return signature;
+  const normalizedV = (vByte % 2 === 0 ? 28 : 27).toString(16).padStart(2, '0');
+  return `${signature.slice(0, 130)}${normalizedV}` as `0x${string}`;
+}
+
+/**
  * POST /api/auth/verify
  * Verify a wallet signature and create/find the user + Supabase session.
  *
@@ -38,12 +54,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Verify the signature cryptographically
-    const isValid = await verifyMessage({
-      address: address as `0x${string}`,
-      message,
-      signature: signature as `0x${string}`,
-    });
+    // 2. Verify the signature cryptographically. Some wallets hand back a
+    // non-standard v byte (see normalizeSignatureV) that makes viem throw
+    // rather than return false, so retry once with it folded to a valid value.
+    let isValid: boolean;
+    try {
+      isValid = await verifyMessage({
+        address: address as `0x${string}`,
+        message,
+        signature: signature as `0x${string}`,
+      });
+    } catch {
+      isValid = await verifyMessage({
+        address: address as `0x${string}`,
+        message,
+        signature: normalizeSignatureV(signature as `0x${string}`),
+      });
+    }
 
     if (!isValid) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
