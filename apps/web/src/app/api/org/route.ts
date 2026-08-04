@@ -4,6 +4,32 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { cookies } from 'next/headers';
 import { SESSION_COOKIE_NAME } from '@/lib/utils/constants';
 import { verifyWalletSessionToken } from '@/lib/auth/session';
+import { readContractPublic } from '@/lib/genlayer/client';
+
+// ──────────────────────────────────────────
+// On-chain merge helpers
+//
+// The deployed PolicyComplianceGate contract is keyed by the same UUID
+// Supabase uses as `organizations.id` (see ensureOrgRegisteredOnChain /
+// create-org-form.tsx, which calls register_org(org.id, org.name)). Reads
+// are best-effort: on any failure we keep the Supabase value and mark
+// _onChainVerified: false so the frontend can show a "cached" badge
+// instead of crashing the page.
+// ──────────────────────────────────────────
+
+async function mergeOrgOnChain(organization: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    const raw = (await readContractPublic('get_org', [organization.id])) as string;
+    const parsed = JSON.parse(raw) as { error?: string; active?: boolean };
+    if (parsed.error) {
+      throw new Error(parsed.error);
+    }
+    return { ...organization, active: parsed.active, _onChainVerified: true };
+  } catch (err) {
+    console.warn(`On-chain get_org read failed for org ${organization.id as string}:`, err);
+    return { ...organization, _onChainVerified: false };
+  }
+}
 
 async function getSessionUser() {
   const cookieStore = await cookies();
@@ -53,7 +79,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ memberships });
+  const mergedMemberships = await Promise.all(
+    (memberships ?? []).map(async (membership) => {
+      const organization = membership.organization as Record<string, unknown> | null;
+      if (!organization) return membership;
+      return { ...membership, organization: await mergeOrgOnChain(organization) };
+    }),
+  );
+
+  return NextResponse.json({ memberships: mergedMemberships });
 }
 
 // ──────────────────────────────────────────

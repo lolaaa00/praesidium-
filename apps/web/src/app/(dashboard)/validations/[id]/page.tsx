@@ -158,6 +158,15 @@ export default function ValidationDetailPage({
                 {vConfig.label}
               </span>
             )}
+            {v._onChainVerified ? (
+              <span className="inline-flex rounded-full bg-pass/15 px-2 py-0.5 text-xs font-medium text-pass">
+                Verified on-chain
+              </span>
+            ) : (
+              <span className="inline-flex rounded-full bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn">
+                Cached (on-chain read failed)
+              </span>
+            )}
           </div>
           <p className="mt-1 font-mono text-xs text-muted-foreground">{v.id as string}</p>
         </div>

@@ -82,9 +82,20 @@ export default function EscalationDetailPage({
             </div>
             <p className="mt-1 font-mono text-xs text-muted-foreground">{esc.id}</p>
           </div>
-          <span className={`rounded-md px-2.5 py-1 text-xs font-medium ${STATUS_BADGE[esc.status] ?? 'bg-muted text-muted-foreground'}`}>
-            {isOpen ? 'Open' : esc.status.replace('_', ' ')}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`rounded-md px-2.5 py-1 text-xs font-medium ${STATUS_BADGE[esc.status] ?? 'bg-muted text-muted-foreground'}`}>
+              {isOpen ? 'Open' : esc.status.replace('_', ' ')}
+            </span>
+            {esc._onChainVerified ? (
+              <span className="inline-flex rounded-full bg-pass/15 px-2 py-0.5 text-xs font-medium text-pass">
+                Verified on-chain
+              </span>
+            ) : (
+              <span className="inline-flex rounded-full bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn">
+                Cached (on-chain read failed)
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 space-y-3 text-sm">

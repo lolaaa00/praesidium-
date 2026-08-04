@@ -18,6 +18,10 @@ interface PolicyRow {
   created_at: string;
   updated_at: string;
   policy_rules?: RuleRow[] | { count: number }[];
+  /** On-chain fields merged in on read — see /api/policies/[id]. */
+  rules_hash?: string;
+  active?: boolean;
+  _onChainVerified?: boolean;
 }
 
 interface RuleRow {

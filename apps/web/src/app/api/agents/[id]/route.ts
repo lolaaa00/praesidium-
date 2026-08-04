@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { randomBytes, createHash } from 'crypto';
 import { requireAuth, isAuthError } from '@/lib/api/auth-check';
+import { readContractPublic } from '@/lib/genlayer/client';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -35,7 +36,25 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ agent });
+  // Status authority moves to the deployed contract on reads — it's keyed
+  // by the same UUID as `agents.id` (see register_agent call in
+  // agents/new/page.tsx). AGENT_STATUS_* on-chain constants use the exact
+  // same strings as the Supabase `agent_status` enum, so this is a direct
+  // overwrite. Best-effort: fall back to Supabase on any on-chain failure.
+  let mergedAgent: Record<string, unknown> = { ...agent };
+  try {
+    const raw = (await readContractPublic('get_agent', [id])) as string;
+    const parsed = JSON.parse(raw) as { error?: string; status?: string };
+    if (parsed.error) {
+      throw new Error(parsed.error);
+    }
+    mergedAgent = { ...mergedAgent, status: parsed.status, _onChainVerified: true };
+  } catch (err) {
+    console.warn(`On-chain get_agent read failed for agent ${id}:`, err);
+    mergedAgent = { ...mergedAgent, _onChainVerified: false };
+  }
+
+  return NextResponse.json({ agent: mergedAgent });
 }
 
 // ──────────────────────────────────────────

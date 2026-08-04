@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth, isAuthError } from '@/lib/api/auth-check';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { readContractPublic } from '@/lib/genlayer/client';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -32,7 +33,37 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'Policy not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ policy });
+  // On production reads, version/rules_hash/active come from the deployed
+  // contract (the Intelligent Contract is the source of truth for these
+  // fields) — Supabase stays authoritative for rule text. The contract is
+  // keyed by the same UUID as `policies.id` (see register_policy call in
+  // policies/new/page.tsx). Best-effort: fall back to the Supabase value
+  // and flag _onChainVerified: false rather than failing the page.
+  let mergedPolicy: Record<string, unknown> = { ...policy };
+  try {
+    const raw = (await readContractPublic('get_policy', [id])) as string;
+    const parsed = JSON.parse(raw) as {
+      error?: string;
+      version?: number;
+      rules_hash?: string;
+      active?: boolean;
+    };
+    if (parsed.error) {
+      throw new Error(parsed.error);
+    }
+    mergedPolicy = {
+      ...mergedPolicy,
+      version: parsed.version,
+      rules_hash: parsed.rules_hash,
+      active: parsed.active,
+      _onChainVerified: true,
+    };
+  } catch (err) {
+    console.warn(`On-chain get_policy read failed for policy ${id}:`, err);
+    mergedPolicy = { ...mergedPolicy, _onChainVerified: false };
+  }
+
+  return NextResponse.json({ policy: mergedPolicy });
 }
 
 // ──────────────────────────────────────────

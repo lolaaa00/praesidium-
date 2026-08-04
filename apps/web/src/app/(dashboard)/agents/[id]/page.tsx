@@ -188,6 +188,15 @@ export default function AgentDetailPage({
               <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
                 {TYPE_LABEL[agent.agent_type] ?? agent.agent_type}
               </span>
+              {agent._onChainVerified ? (
+                <span className="inline-flex rounded-full bg-pass/15 px-2 py-0.5 text-xs font-medium text-pass">
+                  Verified on-chain
+                </span>
+              ) : (
+                <span className="inline-flex rounded-full bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn">
+                  Cached (on-chain read failed)
+                </span>
+              )}
             </div>
             {agent.description && (
               <p className="mt-1 text-muted-foreground">{agent.description}</p>

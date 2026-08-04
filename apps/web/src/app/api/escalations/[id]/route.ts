@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth, isAuthError } from '@/lib/api/auth-check';
+import { readContractPublic } from '@/lib/genlayer/client';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -32,7 +33,41 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'Escalation not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ escalation });
+  // The contract derives its escalation_id as f"esc-{request_id}" (see
+  // _open_escalation in contracts/src/policy_compliance_gate.py) — it is
+  // NOT the Supabase escalations.id, it's built from the validation
+  // request's id. NOTE: on-chain status uses 'open' | 'resolved' |
+  // 'dismissed' while Supabase escalations.status uses
+  // 'open' | 'approved' | 'rejected' | 'policy_updated' — these vocabularies
+  // don't map onto each other, and on-chain resolved_by is a hex address
+  // (not the Supabase user_profiles UUID resolution_note.resolved_by
+  // expects). Overwriting `status`/`resolved_by` with the raw on-chain
+  // values would silently corrupt fields the UI depends on having specific
+  // enum/FK values, so we only merge resolution_notes (safe, free text) and
+  // otherwise just surface on-chain read success via _onChainVerified so
+  // the frontend can show a badge. Flagged for review — see task notes.
+  let mergedEscalation: Record<string, unknown> = { ...escalation };
+  const onChainEscalationId = `esc-${escalation.request_id}`;
+  try {
+    const raw = (await readContractPublic('get_escalation', [onChainEscalationId])) as string;
+    const parsed = JSON.parse(raw) as {
+      error?: string;
+      resolution_notes?: string;
+    };
+    if (parsed.error) {
+      throw new Error(parsed.error);
+    }
+    mergedEscalation = {
+      ...mergedEscalation,
+      resolution_note: parsed.resolution_notes || mergedEscalation.resolution_note,
+      _onChainVerified: true,
+    };
+  } catch (err) {
+    console.warn(`On-chain get_escalation read failed for escalation ${id} (chain id ${onChainEscalationId}):`, err);
+    mergedEscalation = { ...mergedEscalation, _onChainVerified: false };
+  }
+
+  return NextResponse.json({ escalation: mergedEscalation });
 }
 
 // ──────────────────────────────────────────

@@ -253,6 +253,15 @@ export default function PolicyDetailPage({
                 {policy.status}
               </span>
               <span className="text-sm text-muted-foreground font-mono">v{policy.version}</span>
+              {policy._onChainVerified ? (
+                <span className="inline-flex rounded-full bg-pass/15 px-2 py-0.5 text-xs font-medium text-pass">
+                  Verified on-chain
+                </span>
+              ) : (
+                <span className="inline-flex rounded-full bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn">
+                  Cached (on-chain read failed)
+                </span>
+              )}
             </div>
             {policy.description && (
               <p className="mt-1 text-muted-foreground">{policy.description}</p>

@@ -22,6 +22,8 @@ interface AgentRow {
   created_at: string;
   updated_at: string;
   genlayer_address: string | null;
+  /** Merged in on read from the deployed contract — see /api/agents/[id]. */
+  _onChainVerified?: boolean;
 }
 
 interface PermissionRow {

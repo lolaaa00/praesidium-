@@ -16,6 +16,8 @@ interface EscalationRow {
   final_verdict: string | null;
   created_at: string;
   resolved_at: string | null;
+  /** Merged in on read from the deployed contract — see /api/escalations/[id]. */
+  _onChainVerified?: boolean;
 }
 
 export function useEscalation(id: string) {

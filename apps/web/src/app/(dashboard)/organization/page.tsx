@@ -12,7 +12,7 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
-import { useOrgMembers, useInviteMember, useRemoveMember, useUpdateOrg } from '@/hooks/queries/use-org';
+import { useOrgMembers, useInviteMember, useRemoveMember, useUpdateOrg, useOrgMemberships } from '@/hooks/queries/use-org';
 import { useOrgStore } from '@/stores/org-store';
 
 const ROLE_CONFIG: Record<string, { icon: React.ElementType; badge: string; label: string }> = {
@@ -24,11 +24,14 @@ const ROLE_CONFIG: Record<string, { icon: React.ElementType; badge: string; labe
 export default function OrganizationPage() {
   const { currentOrgId, currentOrgName, currentOrgSlug } = useOrgStore();
   const { data, isLoading } = useOrgMembers();
+  const { data: membershipsData } = useOrgMemberships();
   const inviteMember = useInviteMember();
   const removeMember = useRemoveMember();
   const updateOrg = useUpdateOrg();
 
   const members = (data?.members ?? []) as Array<Record<string, unknown>>;
+  const currentMembership = membershipsData?.memberships?.find((m) => m.org_id === currentOrgId);
+  const currentOrganization = currentMembership?.organization;
 
   const [inviteWallet, setInviteWallet] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
@@ -96,6 +99,18 @@ export default function OrganizationPage() {
             <Building2 className="h-5 w-5 text-primary" />
           </div>
           <h2 className="text-lg font-semibold">Organization Details</h2>
+          {currentOrganization?.active === false && (
+            <span className="rounded-full bg-fail/15 px-2 py-0.5 text-xs font-medium text-fail">Inactive</span>
+          )}
+          {currentOrganization?._onChainVerified ? (
+            <span className="inline-flex rounded-full bg-pass/15 px-2 py-0.5 text-xs font-medium text-pass">
+              Verified on-chain
+            </span>
+          ) : (
+            <span className="inline-flex rounded-full bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn">
+              Cached (on-chain read failed)
+            </span>
+          )}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
