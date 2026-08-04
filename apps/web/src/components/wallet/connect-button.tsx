@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
 import { useAuth } from '@/hooks/use-auth';
 import { useAuthStore } from '@/stores/auth-store';
 import { truncateAddress } from '@/lib/utils/formatting';
@@ -13,11 +12,15 @@ import { truncateAddress } from '@/lib/utils/formatting';
  */
 export function ConnectButton() {
   const router = useRouter();
-  const { isConnected, address } = useAccount();
-  const { isAuthenticated, isLoading, connectWallet, signIn } = useAuth();
+  const { isAuthenticated, isLoading, isWalletConnected: isConnected, walletAddress: address, walletMode, connectWallet, signIn } = useAuth();
   const user = useAuthStore((s) => s.user);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hasInjectedWallet, setHasInjectedWallet] = useState(true);
+
+  useEffect(() => {
+    setHasInjectedWallet(typeof window !== 'undefined' && !!window.ethereum);
+  }, []);
 
   // isAuthenticated can become true from loadSession() finding an existing
   // valid cookie on mount (e.g. you reload /connect while already signed
@@ -105,17 +108,24 @@ export function ConnectButton() {
                   d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 6v3"
                 />
               </svg>
-              Connect Wallet
+              {hasInjectedWallet ? 'Connect Wallet' : 'Continue without a wallet'}
             </>
           )}
         </button>
       ) : (
         <div className="space-y-3">
           <div className="rounded-lg border bg-muted/50 p-3 text-center">
-            <p className="text-xs text-muted-foreground">Connected as</p>
+            <p className="text-xs text-muted-foreground">
+              {walletMode === 'generated' ? 'Browser wallet (generated)' : 'Connected'}
+            </p>
             <p className="mt-1 font-mono text-sm font-medium">
               {address ? truncateAddress(address) : '...'}
             </p>
+            {walletMode === 'generated' && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                No MetaMask detected — using a wallet generated and stored in this browser.
+              </p>
+            )}
           </div>
           <button
             onClick={handleSignIn}

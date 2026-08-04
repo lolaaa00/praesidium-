@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useWalletAccount } from '@/hooks/use-wallet-account';
 import Link from 'next/link';
 import { ArrowLeft, Bot, Copy, Check, AlertTriangle } from 'lucide-react';
 import { useRegisterAgent } from '@/hooks/queries/use-agents';
 import { useOrgStore } from '@/stores/org-store';
-import { ensureOrgRegisteredOnChain, writeContractAsUser } from '@/lib/genlayer/client';
+import { ensureOrgRegisteredOnChain, writeContractAsUser, UndeterminedTransactionError } from '@/lib/genlayer/client';
 import { getErrorMessage } from '@/lib/utils/errors';
 
 const AGENT_TYPES = [
@@ -17,7 +17,7 @@ const AGENT_TYPES = [
 ] as const;
 
 export default function RegisterAgentPage() {
-  const { address } = useAccount();
+  const { address } = useWalletAccount();
   const { currentOrgId, currentOrgName } = useOrgStore();
   const registerAgent = useRegisterAgent();
 
@@ -26,9 +26,39 @@ export default function RegisterAgentPage() {
   const [agentType, setAgentType] = useState<typeof AGENT_TYPES[number]['value']>('autonomous');
   const [error, setError] = useState('');
   const [chainStatus, setChainStatus] = useState<string | null>(null);
+  const [chainUndetermined, setChainUndetermined] = useState(false);
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
   const [newAgentAddress, setNewAgentAddress] = useState<string | null>(null);
+  const [registeredAgentId, setRegisteredAgentId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  async function registerAgentOnChain(agentId: string) {
+    if (!address || !currentOrgId) return;
+    try {
+      setChainUndetermined(false);
+      setChainStatus('Confirm in your wallet to register the agent on-chain...');
+      await ensureOrgRegisteredOnChain(address, currentOrgId, currentOrgName ?? currentOrgId);
+      await writeContractAsUser(address, 'register_agent', [
+        agentId,
+        currentOrgId,
+        name.trim(),
+        agentType,
+        true,
+        agentType !== 'chatbot',
+      ]);
+      setChainStatus(null);
+    } catch (chainErr) {
+      if (chainErr instanceof UndeterminedTransactionError) {
+        setChainStatus(null);
+        setChainUndetermined(true);
+      } else {
+        console.warn('On-chain agent registration failed:', chainErr);
+        setChainStatus(
+          `On-chain registration failed: ${getErrorMessage(chainErr)}. The agent still works via the engine.`,
+        );
+      }
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,29 +75,13 @@ export default function RegisterAgentPage() {
       });
       setNewApiKey(result.apiKey);
       setNewAgentAddress(result.agent.genlayer_address ?? null);
+      setRegisteredAgentId(result.agent.id);
 
       // Register the agent on-chain, signed by the registering user. Best
       // effort — the agent already works via the engine regardless, since
       // validate_action stays permissive for unregistered agents.
       if (address && currentOrgId) {
-        try {
-          setChainStatus('Confirm in your wallet to register the agent on-chain...');
-          await ensureOrgRegisteredOnChain(address, currentOrgId, currentOrgName ?? currentOrgId);
-          await writeContractAsUser(address, 'register_agent', [
-            result.agent.id,
-            currentOrgId,
-            name.trim(),
-            agentType,
-            true,
-            agentType !== 'chatbot',
-          ]);
-          setChainStatus(null);
-        } catch (chainErr) {
-          console.warn('On-chain agent registration failed:', chainErr);
-          setChainStatus(
-            `On-chain registration failed: ${getErrorMessage(chainErr)}. The agent still works via the engine.`,
-          );
-        }
+        await registerAgentOnChain(result.agent.id);
       } else {
         setChainStatus(
           `On-chain registration skipped (${!address ? 'no wallet address' : 'no org selected'}). The agent still works via the engine.`,
@@ -103,6 +117,20 @@ export default function RegisterAgentPage() {
           {chainStatus && (
             <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
               {chainStatus}
+            </div>
+          )}
+
+          {chainUndetermined && registeredAgentId && (
+            <div className="space-y-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm">
+              <p className="font-medium text-amber-700 dark:text-amber-400">
+                Validators could not agree — nothing was written on-chain. The agent still works via the engine.
+              </p>
+              <button
+                onClick={() => registerAgentOnChain(registeredAgentId)}
+                className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Retry on-chain registration
+              </button>
             </div>
           )}
 

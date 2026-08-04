@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useAccount } from 'wagmi';
+import { useWalletAccount } from '@/hooks/use-wallet-account';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, RefreshCw, Clock, Pause, Play } from 'lucide-react';
 import { useContractStatus, contractKeys } from '@/hooks/queries/use-contract';
-import { readContractPublic, writeContractAsUser } from '@/lib/genlayer/client';
+import { readContractPublic, writeContractAsUser, UndeterminedTransactionError } from '@/lib/genlayer/client';
 import { getErrorMessage } from '@/lib/utils/errors';
 
 const STATUS_CONFIG: Record<string, { icon: React.ElementType; badge: string; label: string }> = {
@@ -24,7 +24,7 @@ const SYSTEM_CHECKS = [
 export default function SystemHealthPage() {
   const { data, isLoading, dataUpdatedAt } = useContractStatus();
   const qc = useQueryClient();
-  const { address } = useAccount();
+  const { address } = useWalletAccount();
   const [chainStatus, setChainStatus] = useState<string | null>(null);
 
   const status = data?.status ?? 'offline';
@@ -49,8 +49,12 @@ export default function SystemHealthPage() {
       await refetchPaused();
       setChainStatus(null);
     } catch (chainErr) {
-      console.warn('Pause toggle failed:', chainErr);
-      setChainStatus(`Pause toggle failed: ${getErrorMessage(chainErr)}`);
+      if (chainErr instanceof UndeterminedTransactionError) {
+        setChainStatus('Validators could not agree — nothing was written. Retry?');
+      } else {
+        console.warn('Pause toggle failed:', chainErr);
+        setChainStatus(`Pause toggle failed: ${getErrorMessage(chainErr)}`);
+      }
     }
   }
 
@@ -181,7 +185,17 @@ export default function SystemHealthPage() {
           </button>
         </div>
         {chainStatus && (
-          <div className="mt-3 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">{chainStatus}</div>
+          <div className="mt-3 flex items-center gap-3 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
+            <span>{chainStatus}</span>
+            {chainStatus.endsWith('Retry?') && (
+              <button
+                onClick={handleTogglePause}
+                className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Retry
+              </button>
+            )}
+          </div>
         )}
       </div>
 

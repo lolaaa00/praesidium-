@@ -29,6 +29,7 @@ export function useValidations(
     page?: number;
     limit?: number;
   } = {},
+  options: { enabled?: boolean } = {},
 ) {
   const { status, verdict, agentId, policyId, page = 1, limit = 20 } = filters;
 
@@ -41,6 +42,7 @@ export function useValidations(
       page,
       limit,
     }),
+    enabled: options.enabled ?? true,
     queryFn: async () => {
       const params = new URLSearchParams();
       if (status) params.set('status', status);

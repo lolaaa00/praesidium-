@@ -11,10 +11,45 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { useComplianceAnalytics, useRiskAnalytics } from '@/hooks/queries/use-analytics';
 import { useValidations } from '@/hooks/queries/use-validations';
 import { usePolicies } from '@/hooks/queries/use-policies';
 import { useAgents } from '@/hooks/queries/use-agents';
+import { useAuth } from '@/hooks/use-auth';
+import { readContractPublic } from '@/lib/genlayer/client';
+
+/**
+ * Visitors who haven't connected a wallet still get to see the dashboard
+ * shell — org-scoped Supabase data needs an authenticated session, but the
+ * contract's own pause state is a public on-chain read (readContractPublic
+ * uses a throwaway account, no wallet or signature required), so at least
+ * something real renders instead of an auth wall.
+ */
+function ReadOnlyPreviewBanner() {
+  const { data: isPaused, isLoading } = useQuery({
+    queryKey: ['genlayer', 'is_paused', 'preview'],
+    queryFn: () => readContractPublic('is_paused') as Promise<boolean>,
+  });
+
+  return (
+    <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+      <p className="text-sm font-medium">Read-only preview</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        You&apos;re browsing without a connected wallet — this shows public on-chain contract
+        state only.{' '}
+        <Link href="/connect" className="text-primary underline">
+          Connect a wallet
+        </Link>{' '}
+        to see your organization&apos;s policies, agents, and validation history.
+      </p>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Contract status:{' '}
+        {isLoading ? '…' : isPaused ? 'validation paused' : 'validation active'}
+      </p>
+    </div>
+  );
+}
 
 function StatCard({
   label,
@@ -54,11 +89,12 @@ function StatCard({
 }
 
 export default function OverviewPage() {
-  const { data: compliance } = useComplianceAnalytics(30);
-  const { data: risk } = useRiskAnalytics(30);
-  const { data: validationsData } = useValidations({ limit: 5 });
-  const { data: policiesData } = usePolicies({ status: 'active' });
-  const { data: agentsData } = useAgents({ status: 'active' });
+  const { isAuthenticated } = useAuth();
+  const { data: compliance } = useComplianceAnalytics(30, { enabled: isAuthenticated });
+  const { data: risk } = useRiskAnalytics(30, { enabled: isAuthenticated });
+  const { data: validationsData } = useValidations({ limit: 5 }, { enabled: isAuthenticated });
+  const { data: policiesData } = usePolicies({ status: 'active' }, { enabled: isAuthenticated });
+  const { data: agentsData } = useAgents({ status: 'active' }, { enabled: isAuthenticated });
 
   const summary = compliance?.summary;
   const recentValidations = validationsData?.validations ?? [];
@@ -71,6 +107,8 @@ export default function OverviewPage() {
           Compliance dashboard with key metrics and recent activity.
         </p>
       </div>
+
+      {!isAuthenticated && <ReadOnlyPreviewBanner />}
 
       {/* Stats Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

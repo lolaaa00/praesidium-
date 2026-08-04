@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
 import {
   Loader2,
   ArrowLeft,
@@ -12,8 +11,9 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useOrgStore } from '@/stores/org-store';
-import { writeContractAsUser } from '@/lib/genlayer/client';
+import { writeContractAsUser, UndeterminedTransactionError } from '@/lib/genlayer/client';
 import { getErrorMessage } from '@/lib/utils/errors';
+import { useWalletAccount } from '@/hooks/use-wallet-account';
 
 interface CreateOrgFormProps {
   onBack: () => void;
@@ -45,7 +45,7 @@ const STARTER_TEMPLATES = [
 
 export function CreateOrgForm({ onBack }: CreateOrgFormProps) {
   const router = useRouter();
-  const { address } = useAccount();
+  const { address } = useWalletAccount();
   const { setCurrentOrg } = useOrgStore();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -53,7 +53,9 @@ export function CreateOrgForm({ onBack }: CreateOrgFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [chainStatus, setChainStatus] = useState<string | null>(null);
   const [chainError, setChainError] = useState<string | null>(null);
+  const [chainUndetermined, setChainUndetermined] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingOrg, setPendingOrg] = useState<{ id: string; name: string } | null>(null);
 
   const slug = name
     .toLowerCase()
@@ -103,14 +105,19 @@ export function CreateOrgForm({ onBack }: CreateOrgFormProps) {
       // we stop short of navigating away so the error is actually visible
       // instead of vanishing on route change.
       if (address) {
+        setPendingOrg({ id: data.organization.id, name: data.organization.name });
         try {
           setChainStatus('Confirm in your wallet to register the org on-chain...');
           await writeContractAsUser(address, 'register_org', [data.organization.id, data.organization.name]);
           setChainStatus(null);
         } catch (chainErr) {
-          console.warn('On-chain org registration failed:', chainErr);
           setChainStatus(null);
-          setChainError(getErrorMessage(chainErr));
+          if (chainErr instanceof UndeterminedTransactionError) {
+            setChainUndetermined(true);
+          } else {
+            console.warn('On-chain org registration failed:', chainErr);
+            setChainError(getErrorMessage(chainErr));
+          }
           return;
         }
       }
@@ -120,6 +127,25 @@ export function CreateOrgForm({ onBack }: CreateOrgFormProps) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function retryChainRegistration() {
+    if (!address || !pendingOrg) return;
+    setChainUndetermined(false);
+    setChainError(null);
+    try {
+      setChainStatus('Confirm in your wallet to register the org on-chain...');
+      await writeContractAsUser(address, 'register_org', [pendingOrg.id, pendingOrg.name]);
+      setChainStatus(null);
+      router.push('/overview');
+    } catch (chainErr) {
+      setChainStatus(null);
+      if (chainErr instanceof UndeterminedTransactionError) {
+        setChainUndetermined(true);
+      } else {
+        setChainError(getErrorMessage(chainErr));
+      }
     }
   }
 
@@ -254,6 +280,30 @@ export function CreateOrgForm({ onBack }: CreateOrgFormProps) {
         {chainStatus && (
           <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
             {chainStatus}
+          </div>
+        )}
+
+        {chainUndetermined && (
+          <div className="space-y-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm">
+            <p className="font-medium text-amber-700 dark:text-amber-400">
+              Validators could not agree — nothing was written.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={retryChainRegistration}
+                className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/overview')}
+                className="text-xs text-muted-foreground underline"
+              >
+                Continue anyway
+              </button>
+            </div>
           </div>
         )}
 

@@ -2,11 +2,10 @@
 
 import { useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount, useSignMessage, useConnect, useDisconnect } from 'wagmi';
-import { injected } from 'wagmi';
 import { useAuthStore } from '@/stores/auth-store';
 import { useOrgStore } from '@/stores/org-store';
 import { buildSignMessage } from '@/lib/wallet/auth';
+import { useWalletAccount } from '@/hooks/use-wallet-account';
 
 /**
  * Core auth hook — manages wallet connection, signature-based login,
@@ -14,10 +13,7 @@ import { buildSignMessage } from '@/lib/wallet/auth';
  */
 export function useAuth() {
   const router = useRouter();
-  const { address, isConnected } = useAccount();
-  const { connectAsync } = useConnect();
-  const { disconnectAsync } = useDisconnect();
-  const { signMessageAsync } = useSignMessage();
+  const { address, isConnected, mode, connect, signMessage, disconnect } = useWalletAccount();
   const { user, isLoading, isAuthenticated, setUser, setLoading, logout: clearAuth } = useAuthStore();
   const { setCurrentOrg, clearOrg } = useOrgStore();
 
@@ -63,15 +59,14 @@ export function useAuth() {
 
   const connectWallet = useCallback(async () => {
     try {
-      // 1. Connect wallet
       if (!isConnected) {
-        await connectAsync({ connector: injected() });
+        await connect();
       }
     } catch (error) {
       console.error('Wallet connection failed:', error);
       throw error;
     }
-  }, [isConnected, connectAsync]);
+  }, [isConnected, connect]);
 
   const signIn = useCallback(async () => {
     if (!address) {
@@ -87,7 +82,7 @@ export function useAuth() {
 
       // 2. Build and sign message
       const message = buildSignMessage(nonce);
-      const signature = await signMessageAsync({ message });
+      const signature = await signMessage(message);
 
       // 3. Verify on server
       const verifyRes = await fetch('/api/auth/verify', {
@@ -126,7 +121,7 @@ export function useAuth() {
       console.error('Sign-in failed:', error);
       throw error;
     }
-  }, [address, signMessageAsync, loadSession, router, setLoading]);
+  }, [address, signMessage, loadSession, router, setLoading]);
 
   const logout = useCallback(async () => {
     try {
@@ -134,7 +129,7 @@ export function useAuth() {
       await fetch('/api/auth/logout', { method: 'POST' });
 
       // Disconnect wallet
-      await disconnectAsync();
+      await disconnect();
 
       // Clear stores
       clearAuth();
@@ -147,7 +142,7 @@ export function useAuth() {
       clearOrg();
       router.push('/');
     }
-  }, [disconnectAsync, clearAuth, clearOrg, router]);
+  }, [disconnect, clearAuth, clearOrg, router]);
 
   return {
     user,
@@ -155,6 +150,7 @@ export function useAuth() {
     isAuthenticated,
     isWalletConnected: isConnected,
     walletAddress: address,
+    walletMode: mode,
     connectWallet,
     signIn,
     logout,

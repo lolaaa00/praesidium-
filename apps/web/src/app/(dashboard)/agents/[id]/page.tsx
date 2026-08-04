@@ -2,7 +2,7 @@
 
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useWalletAccount } from '@/hooks/use-wallet-account';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -18,7 +18,7 @@ import {
 import { useAgent, useUpdateAgent, useRevokeAgent } from '@/hooks/queries/use-agents';
 import { useValidations } from '@/hooks/queries/use-validations';
 import { useOrgStore } from '@/stores/org-store';
-import { ensureOrgRegisteredOnChain, writeContractAsUser } from '@/lib/genlayer/client';
+import { ensureOrgRegisteredOnChain, writeContractAsUser, UndeterminedTransactionError } from '@/lib/genlayer/client';
 import { getErrorMessage } from '@/lib/utils/errors';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -48,7 +48,7 @@ export default function AgentDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const { address } = useAccount();
+  const { address } = useWalletAccount();
   const { currentOrgName } = useOrgStore();
 
   const { data, isLoading } = useAgent(id);
@@ -103,10 +103,16 @@ export default function AgentDetailPage({
       setChainStatus(null);
       return true;
     } catch (chainErr) {
-      console.warn('On-chain agent status sync failed:', chainErr);
-      setChainStatus(
-        `On-chain ${method.replace('_', ' ')} failed: ${getErrorMessage(chainErr)}`,
-      );
+      if (chainErr instanceof UndeterminedTransactionError) {
+        setChainStatus(
+          'Validators could not agree — nothing was written. Retry the action to try again.',
+        );
+      } else {
+        console.warn('On-chain agent status sync failed:', chainErr);
+        setChainStatus(
+          `On-chain ${method.replace('_', ' ')} failed: ${getErrorMessage(chainErr)}`,
+        );
+      }
       return false;
     }
   }

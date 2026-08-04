@@ -1,9 +1,6 @@
 {
-  "buildCommand": "cd ../.. && pnpm turbo build --filter=@praesidium/web",
-  "outputDirectory": "apps/web/.next",
-  "installCommand": "pnpm install",
-  "framework": "nextjs",
-  "env": {
-    "NEXT_PUBLIC_GENLAYER_NETWORK": "studionet"
-  }
+  "buildCommand": "pnpm turbo build --filter=@praesidium/web",
+  "outputDirectory": ".next",
+  "installCommand": "pnpm install --frozen-lockfile=false",
+  "framework": "nextjs"
 }

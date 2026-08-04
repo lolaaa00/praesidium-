@@ -2,17 +2,17 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useWalletAccount } from '@/hooks/use-wallet-account';
 import Link from 'next/link';
 import { ArrowLeft, Shield } from 'lucide-react';
 import { useCreatePolicy } from '@/hooks/queries/use-policies';
 import { useOrgStore } from '@/stores/org-store';
-import { ensureOrgRegisteredOnChain, writeContractAsUser, hashText } from '@/lib/genlayer/client';
+import { ensureOrgRegisteredOnChain, writeContractAsUser, hashText, UndeterminedTransactionError } from '@/lib/genlayer/client';
 import { getErrorMessage } from '@/lib/utils/errors';
 
 export default function NewPolicyPage() {
   const router = useRouter();
-  const { address } = useAccount();
+  const { address } = useWalletAccount();
   const { currentOrgId, currentOrgName } = useOrgStore();
   const createPolicy = useCreatePolicy();
 
@@ -21,7 +21,36 @@ export default function NewPolicyPage() {
   const [error, setError] = useState('');
   const [chainStatus, setChainStatus] = useState<string | null>(null);
   const [chainError, setChainError] = useState<string | null>(null);
+  const [chainUndetermined, setChainUndetermined] = useState(false);
   const [createdPolicyId, setCreatedPolicyId] = useState<string | null>(null);
+
+  async function registerOnChain(policyId: string) {
+    if (!address || !currentOrgId) return;
+    try {
+      setChainStatus('Confirm in your wallet to register the policy on-chain...');
+      setChainUndetermined(false);
+      setChainError(null);
+      await ensureOrgRegisteredOnChain(address, currentOrgId, currentOrgName ?? currentOrgId);
+      const placeholderHash = await hashText(name.trim());
+      await writeContractAsUser(address, 'register_policy', [
+        policyId,
+        currentOrgId,
+        name.trim(),
+        placeholderHash,
+      ]);
+      setChainStatus(null);
+      router.push(`/policies/${policyId}`);
+    } catch (chainErr) {
+      setChainStatus(null);
+      setCreatedPolicyId(policyId);
+      if (chainErr instanceof UndeterminedTransactionError) {
+        setChainUndetermined(true);
+      } else {
+        console.warn('On-chain policy registration failed:', chainErr);
+        setChainError(getErrorMessage(chainErr));
+      }
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,24 +69,8 @@ export default function NewPolicyPage() {
       // yet at creation time, so the hash is a placeholder over the name —
       // it's recomputed for real once rules are added (update_policy_rules).
       if (address && currentOrgId) {
-        try {
-          setChainStatus('Confirm in your wallet to register the policy on-chain...');
-          await ensureOrgRegisteredOnChain(address, currentOrgId, currentOrgName ?? currentOrgId);
-          const placeholderHash = await hashText(name.trim());
-          await writeContractAsUser(address, 'register_policy', [
-            result.policy.id,
-            currentOrgId,
-            name.trim(),
-            placeholderHash,
-          ]);
-          setChainStatus(null);
-        } catch (chainErr) {
-          console.warn('On-chain policy registration failed:', chainErr);
-          setChainStatus(null);
-          setChainError(getErrorMessage(chainErr));
-          setCreatedPolicyId(result.policy.id);
-          return;
-        }
+        await registerOnChain(result.policy.id);
+        return;
       }
 
       router.push(`/policies/${result.policy.id}`);
@@ -119,6 +132,30 @@ export default function NewPolicyPage() {
           {chainStatus && (
             <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
               {chainStatus}
+            </div>
+          )}
+
+          {chainUndetermined && createdPolicyId && (
+            <div className="space-y-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm">
+              <p className="font-medium text-amber-700 dark:text-amber-400">
+                Validators could not agree — nothing was written.
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => registerOnChain(createdPolicyId)}
+                  className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  Retry
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/policies/${createdPolicyId}`)}
+                  className="text-xs text-muted-foreground underline"
+                >
+                  Continue anyway
+                </button>
+              </div>
             </div>
           )}
 

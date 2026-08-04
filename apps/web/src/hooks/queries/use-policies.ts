@@ -68,11 +68,15 @@ export const policyKeys = {
 // Queries
 // ──────────────────────────────────────────
 
-export function usePolicies(filters: { status?: string; page?: number; limit?: number } = {}) {
+export function usePolicies(
+  filters: { status?: string; page?: number; limit?: number } = {},
+  options: { enabled?: boolean } = {},
+) {
   const { status, page = 1, limit = 20 } = filters;
 
   return useQuery({
     queryKey: policyKeys.list({ status: status || '', page, limit }),
+    enabled: options.enabled ?? true,
     queryFn: async () => {
       const params = new URLSearchParams();
       if (status) params.set('status', status);

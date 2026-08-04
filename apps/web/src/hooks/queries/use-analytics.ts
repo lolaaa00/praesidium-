@@ -41,13 +41,14 @@ interface ComplianceResponse {
   period: { days: number; since: string };
 }
 
-export function useComplianceAnalytics(days = 30) {
+export function useComplianceAnalytics(days = 30, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: analyticsKeys.compliance(days),
     queryFn: async () => {
       const res = await orgFetch(`/api/analytics/compliance?days=${days}`);
       return parseResponse<ComplianceResponse>(res);
     },
+    enabled: options.enabled ?? true,
   });
 }
 
@@ -64,12 +65,13 @@ interface RiskResponse {
   period: { days: number; since: string };
 }
 
-export function useRiskAnalytics(days = 30) {
+export function useRiskAnalytics(days = 30, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: analyticsKeys.risk(days),
     queryFn: async () => {
       const res = await orgFetch(`/api/analytics/risk?days=${days}`);
       return parseResponse<RiskResponse>(res);
     },
+    enabled: options.enabled ?? true,
   });
 }

@@ -14,23 +14,30 @@ RUN pnpm install --frozen-lockfile
 # ── Build ──────────────────────────────────────────────────────────────────────
 FROM deps AS builder
 # Copy source
+COPY tsconfig.base.json ./
 COPY packages/shared/ ./packages/shared/
 COPY apps/engine/ ./apps/engine/
 # Build shared, then engine
-RUN pnpm --filter @praesidium/shared build 2>/dev/null || true
+RUN pnpm --filter @praesidium/shared build
 RUN pnpm --filter @praesidium/engine build
 
 # ── Production image ───────────────────────────────────────────────────────────
+# pnpm's symlinked node_modules layout is relative-path and depth-sensitive, so
+# the monorepo directory structure is preserved as-is rather than flattened.
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Only copy what the engine needs at runtime
-COPY --from=builder /app/apps/engine/dist ./dist
-COPY --from=builder /app/apps/engine/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
+COPY --from=builder /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=builder /app/apps/engine/dist ./apps/engine/dist
+COPY --from=builder /app/apps/engine/package.json ./apps/engine/package.json
+COPY --from=builder /app/apps/engine/node_modules ./apps/engine/node_modules
+
+WORKDIR /app/apps/engine
 
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

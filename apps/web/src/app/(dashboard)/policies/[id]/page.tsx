@@ -2,7 +2,7 @@
 
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useWalletAccount } from '@/hooks/use-wallet-account';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -27,7 +27,7 @@ import {
   useDeleteRule,
 } from '@/hooks/queries/use-policies';
 import { useOrgStore } from '@/stores/org-store';
-import { ensureOrgRegisteredOnChain, writeContractAsUser, hashText } from '@/lib/genlayer/client';
+import { ensureOrgRegisteredOnChain, writeContractAsUser, hashText, UndeterminedTransactionError } from '@/lib/genlayer/client';
 import { getErrorMessage } from '@/lib/utils/errors';
 
 const SEVERITY_BADGE: Record<string, string> = {
@@ -68,7 +68,7 @@ export default function PolicyDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const { address } = useAccount();
+  const { address } = useWalletAccount();
   const { currentOrgName } = useOrgStore();
 
   const { data, isLoading } = usePolicy(id);
@@ -146,10 +146,14 @@ export default function PolicyDetailPage({
         }
         setChainStatus(null);
       } catch (chainErr) {
-        console.warn('On-chain rules hash commit failed:', chainErr);
-        setChainStatus(
-          `On-chain rules hash commit failed: ${getErrorMessage(chainErr)}`,
-        );
+        if (chainErr instanceof UndeterminedTransactionError) {
+          setChainStatus('Validators could not agree — nothing was written. Retry the activation to try again.');
+        } else {
+          console.warn('On-chain rules hash commit failed:', chainErr);
+          setChainStatus(
+            `On-chain rules hash commit failed: ${getErrorMessage(chainErr)}`,
+          );
+        }
       }
     } else {
       setChainStatus(

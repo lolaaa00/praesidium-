@@ -23,8 +23,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(requestIdMiddleware);
-const pinoMiddleware = pinoHttp.default || pinoHttp;
-app.use(pinoMiddleware({ logger, autoLogging: { ignore: (req: IncomingMessage) => req.url === '/health' } }));
+app.use(pinoHttp({ logger, autoLogging: { ignore: (req: IncomingMessage) => req.url === '/health' } }));
 
 // ── Routes ──
 app.use(healthRouter);
@@ -34,8 +33,10 @@ app.use(validateRouter);
 app.use(errorHandler);
 
 // ── Start ──
-// Bind to loopback in local dev so the engine can run inside restricted environments.
-app.listen(env.PORT, '127.0.0.1', () => {
+// Loopback-only in local dev (restricted environments); 0.0.0.0 in production
+// so Fly's proxy, which connects from outside the container, can reach it.
+const host = env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
+app.listen(env.PORT, host, () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, 'Praesidium Validation Engine started');
 });
 

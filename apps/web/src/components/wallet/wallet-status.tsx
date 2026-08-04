@@ -8,7 +8,7 @@ import { truncateAddress } from '@/lib/utils/formatting';
  * Shows a dropdown with logout option.
  */
 export function WalletStatus() {
-  const { user, isAuthenticated, logout, isLoading } = useAuth();
+  const { user, isAuthenticated, logout, isLoading, walletMode } = useAuth();
 
   if (isLoading) {
     return <div className="h-8 w-24 animate-pulse rounded-md bg-muted" />;
@@ -18,17 +18,17 @@ export function WalletStatus() {
     return null;
   }
 
+  const modeLabel = walletMode === 'generated' ? 'Browser wallet' : 'Connected';
+
   return (
     <div className="flex items-center gap-3">
       <div className="hidden text-right sm:block">
         <p className="text-sm font-medium">
           {user.displayName || truncateAddress(user.walletAddress)}
         </p>
-        {user.displayName && (
-          <p className="font-mono text-xs text-muted-foreground">
-            {truncateAddress(user.walletAddress)}
-          </p>
-        )}
+        <p className="font-mono text-xs text-muted-foreground">
+          {modeLabel}{user.displayName ? `: ${truncateAddress(user.walletAddress)}` : ''}
+        </p>
       </div>
       <button
         onClick={logout}

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useWalletAccount } from '@/hooks/use-wallet-account';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -17,9 +17,10 @@ import {
 import { useValidations } from '@/hooks/queries/use-validations';
 import { useContractStatus } from '@/hooks/queries/use-contract';
 import { useResolveEscalation } from '@/hooks/queries/use-escalations';
-import { ensureOrgRegisteredOnChain, writeContractAsUser } from '@/lib/genlayer/client';
+import { ensureOrgRegisteredOnChain, writeContractAsUser, UndeterminedTransactionError } from '@/lib/genlayer/client';
 import { useOrgStore } from '@/stores/org-store';
 import { getErrorMessage } from '@/lib/utils/errors';
+import { TxLifecycle, type TxLifecycleStatus } from '@/components/consensus/tx-lifecycle';
 
 const RESOLUTION_OPTIONS = [
   { value: 'approved' as const, label: 'Approve action' },
@@ -37,7 +38,7 @@ const VERDICT_BADGE: Record<string, string> = {
 export default function ConsensusPage() {
   const [tab, setTab] = useState<'escalated' | 'recent'>('escalated');
   const router = useRouter();
-  const { address } = useAccount();
+  const { address } = useWalletAccount();
   const { currentOrgName } = useOrgStore();
   const resolveEscalation = useResolveEscalation();
 
@@ -45,6 +46,9 @@ export default function ConsensusPage() {
   const [resolutionStatus, setResolutionStatus] = useState<'approved' | 'rejected' | 'policy_updated'>('approved');
   const [resolutionNote, setResolutionNote] = useState('');
   const [chainStatus, setChainStatus] = useState<string | null>(null);
+  const [txStatus, setTxStatus] = useState<TxLifecycleStatus>('idle');
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [pendingResolution, setPendingResolution] = useState<{ escalationId: string; requestId: string; orgId: string } | null>(null);
 
   const { data: escalatedData, isLoading: escalatedLoading } = useValidations({
     verdict: 'escalated',
@@ -62,6 +66,34 @@ export default function ConsensusPage() {
     setResolutionNote('');
   }
 
+  async function recordResolutionOnChain(escalationId: string, requestId: string, orgId: string) {
+    if (!address) return;
+    try {
+      setPendingResolution({ escalationId, requestId, orgId });
+      setChainStatus(null);
+      setTxStatus('awaiting_signature');
+      const onChainStatus = resolutionStatus === 'rejected' ? 'dismissed' : 'resolved';
+      await ensureOrgRegisteredOnChain(address, orgId, currentOrgName ?? orgId);
+      setTxStatus('pending');
+      await writeContractAsUser(
+        address,
+        'resolve_escalation',
+        [`esc-${requestId}`, onChainStatus, resolutionNote.trim()],
+        { onSubmitted: (hash) => { setTxHash(hash); setTxStatus('proposing'); } },
+      );
+      setTxStatus('finalized');
+    } catch (chainErr) {
+      if (chainErr instanceof UndeterminedTransactionError) {
+        setTxHash(chainErr.txHash);
+        setTxStatus('undetermined');
+      } else {
+        console.warn('On-chain escalation resolution failed:', chainErr);
+        setTxStatus('error');
+        setChainStatus(getErrorMessage(chainErr));
+      }
+    }
+  }
+
   async function submitResolution(escalationId: string, requestId: string, orgId: string) {
     if (!resolutionNote.trim()) return;
 
@@ -76,22 +108,7 @@ export default function ConsensusPage() {
     // effort — the Supabase record is the source of truth and is already
     // updated regardless of whether this succeeds.
     if (address) {
-      try {
-        setChainStatus('Confirm in your wallet to record the resolution on-chain...');
-        const onChainStatus = resolutionStatus === 'rejected' ? 'dismissed' : 'resolved';
-        await ensureOrgRegisteredOnChain(address, orgId, currentOrgName ?? orgId);
-        await writeContractAsUser(address, 'resolve_escalation', [
-          `esc-${requestId}`,
-          onChainStatus,
-          resolutionNote.trim(),
-        ]);
-        setChainStatus(null);
-      } catch (chainErr) {
-        console.warn('On-chain escalation resolution failed:', chainErr);
-        setChainStatus(
-          `On-chain escalation resolution failed: ${getErrorMessage(chainErr)}`,
-        );
-      }
+      await recordResolutionOnChain(escalationId, requestId, orgId);
     }
   }
 
@@ -130,7 +147,20 @@ export default function ConsensusPage() {
       </div>
 
       {chainStatus && (
-        <div className="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">{chainStatus}</div>
+        <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{chainStatus}</div>
+      )}
+
+      {txStatus !== 'idle' && (
+        <TxLifecycle
+          status={txStatus}
+          txHash={txHash}
+          errorMessage={chainStatus}
+          onRetry={
+            pendingResolution
+              ? () => recordResolutionOnChain(pendingResolution.escalationId, pendingResolution.requestId, pendingResolution.orgId)
+              : undefined
+          }
+        />
       )}
 
       {/* Stats bar */}

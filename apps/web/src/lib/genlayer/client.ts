@@ -1,4 +1,5 @@
 import type { Address } from 'genlayer-js/types';
+import { getStoredGeneratedWallet, isGeneratedWalletAddress } from '@/lib/wallet/generated-wallet';
 
 declare global {
   interface Window {
@@ -9,6 +10,12 @@ declare global {
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS as Address | undefined;
 
+// Consensus rounds on StudioNet (propose -> commit -> reveal) routinely take
+// longer than genlayer-js's default poll window, which times out writes
+// that are still perfectly healthy. Poll less aggressively but for longer.
+const RECEIPT_POLL_INTERVAL_MS = 3000;
+const RECEIPT_POLL_RETRIES = 120; // ~6 minutes at the interval above
+
 async function loadGenlayerSdk() {
   const [{ createClient, createAccount }, { studionet }, { TransactionStatus }] = await Promise.all([
     import('genlayer-js'),
@@ -17,6 +24,32 @@ async function loadGenlayerSdk() {
   ]);
 
   return { createClient, createAccount, studionet, TransactionStatus };
+}
+
+/**
+ * Builds a StudioNet explorer link for a transaction hash. genlayer-js's
+ * studionet chain definition carries blockExplorers.default.url — we reuse
+ * that instead of hardcoding the explorer host so this tracks whatever
+ * network the SDK is actually pointed at.
+ */
+export async function getExplorerTxUrl(txHash: string): Promise<string> {
+  const { studionet } = await import('genlayer-js/chains');
+  const base = studionet.blockExplorers?.default?.url;
+  if (!base) return '';
+  return `${base}/tx/${txHash}`;
+}
+
+/**
+ * Creates a client signed by the locally-generated fallback wallet (see
+ * lib/wallet/generated-wallet.ts). Used when the user has no browser
+ * extension wallet — createAccount(privateKey) gives back a viem-style
+ * local account with its own sign/signMessage/signTransaction, so it slots
+ * into createClient exactly like an injected-wallet account does.
+ */
+async function createGeneratedGenlayerClient(privateKey: `0x${string}`) {
+  const { createClient, createAccount, studionet } = await loadGenlayerSdk();
+  const account = createAccount(privateKey);
+  return createClient({ chain: studionet, account });
 }
 
 /**
@@ -49,7 +82,17 @@ function getInjectedProvider() {
  * Must be called from a browser context — `window.ethereum` is required.
  */
 export async function createUserGenlayerClient(walletAddress: `0x${string}`) {
-  if (typeof window === 'undefined' || !window.ethereum) {
+  if (typeof window === 'undefined') {
+    throw new Error('createUserGenlayerClient must be called from a browser context.');
+  }
+
+  if (!window.ethereum) {
+    // No extension wallet — fall back to the locally-generated wallet if
+    // its address matches what the caller expects.
+    const generated = getStoredGeneratedWallet();
+    if (generated && generated.address.toLowerCase() === walletAddress.toLowerCase()) {
+      return createGeneratedGenlayerClient(generated.privateKey);
+    }
     throw new Error('No browser wallet found. Connect a wallet (e.g. MetaMask, OKX Wallet, Rainbow) first.');
   }
 
@@ -113,10 +156,23 @@ async function switchToGenlayerNetwork(
  * EIP-1193 wallet — see switchToGenlayerNetwork() for why this doesn't use
  * genlayer-js's own (MetaMask-only) client.connect().
  */
+export class UndeterminedTransactionError extends Error {
+  constructor(public readonly txHash: string) {
+    super('Validators could not agree — nothing was written.');
+    this.name = 'UndeterminedTransactionError';
+  }
+}
+
+export interface WriteContractOptions {
+  /** Called as soon as the tx hash is known, before the receipt resolves — lets callers drive a lifecycle UI. */
+  onSubmitted?: (txHash: string) => void;
+}
+
 export async function writeContractAsUser(
   walletAddress: `0x${string}`,
   functionName: string,
   args: unknown[],
+  options?: WriteContractOptions,
 ): Promise<{ txHash: string; result: unknown }> {
   if (!CONTRACT_ADDRESS) {
     throw new Error('NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS is not configured.');
@@ -124,7 +180,13 @@ export async function writeContractAsUser(
 
   const { TransactionStatus } = await loadGenlayerSdk();
   const client = await createUserGenlayerClient(walletAddress);
-  await switchToGenlayerNetwork(getInjectedProvider(), client.chain);
+
+  // Network switching is a wallet_* RPC call that only makes sense against
+  // an injected provider — the generated wallet has no notion of "network"
+  // beyond the chain already baked into its client.
+  if (!isGeneratedWalletAddress(walletAddress)) {
+    await switchToGenlayerNetwork(getInjectedProvider(), client.chain);
+  }
 
   const txHash = await client.writeContract({
     address: CONTRACT_ADDRESS,
@@ -134,11 +196,20 @@ export async function writeContractAsUser(
     value: BigInt(0),
   });
 
+  options?.onSubmitted?.(txHash as string);
+
   const receipt = await client.waitForTransactionReceipt({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     hash: txHash as any,
     status: TransactionStatus.ACCEPTED,
+    interval: RECEIPT_POLL_INTERVAL_MS,
+    retries: RECEIPT_POLL_RETRIES,
   });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((receipt as any)?.status === TransactionStatus.UNDETERMINED) {
+    throw new UndeterminedTransactionError(txHash as string);
+  }
 
   return { txHash: txHash as string, result: receipt };
 }

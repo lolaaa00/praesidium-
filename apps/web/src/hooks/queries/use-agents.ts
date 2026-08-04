@@ -61,11 +61,13 @@ export const agentKeys = {
 
 export function useAgents(
   filters: { status?: string; type?: string; page?: number; limit?: number } = {},
+  options: { enabled?: boolean } = {},
 ) {
   const { status, type, page = 1, limit = 20 } = filters;
 
   return useQuery({
     queryKey: agentKeys.list({ status: status || '', type: type || '', page, limit }),
+    enabled: options.enabled ?? true,
     queryFn: async () => {
       const params = new URLSearchParams();
       if (status) params.set('status', status);
