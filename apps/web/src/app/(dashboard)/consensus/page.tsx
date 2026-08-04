@@ -343,6 +343,12 @@ export default function ConsensusPage() {
                                 <span className="text-xs text-muted-foreground truncate max-w-md">
                                   {esc.reason as string}
                                 </span>
+                                <Link
+                                  href={`/escalations/${escId}`}
+                                  className="text-xs text-primary hover:underline"
+                                >
+                                  View details
+                                </Link>
                                 {isOpen && !isResolving && (
                                   <button
                                     onClick={() => startResolving(escId)}

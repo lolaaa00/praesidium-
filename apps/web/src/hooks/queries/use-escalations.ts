@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { orgFetch, parseResponse } from '@/lib/api/fetch';
 import { validationKeys } from '@/hooks/queries/use-validations';
 
@@ -16,6 +16,17 @@ interface EscalationRow {
   final_verdict: string | null;
   created_at: string;
   resolved_at: string | null;
+}
+
+export function useEscalation(id: string) {
+  return useQuery({
+    queryKey: ['escalations', 'detail', id],
+    queryFn: async () => {
+      const res = await orgFetch(`/api/escalations/${id}`);
+      return parseResponse<{ escalation: EscalationRow & { validation_request: unknown } }>(res);
+    },
+    enabled: !!id,
+  });
 }
 
 export function useResolveEscalation() {
