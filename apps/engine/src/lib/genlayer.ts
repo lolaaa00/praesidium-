@@ -47,9 +47,17 @@ export async function callContract(
 
     logger.info({ txHash, method }, 'Transaction submitted, waiting for receipt');
 
+    // ACCEPTED (validator quorum reached) rather than FINALIZED (a later,
+    // slower step) — sufficient proof of real consensus for recording a
+    // verdict. This is a single blocking HTTP call with no bytes sent
+    // until it resolves, so the wait budget is kept under Fly's proxy
+    // idle-connection timeout (~60s) rather than the much longer windows
+    // used for background test tooling.
     const receipt = await client.waitForTransactionReceipt({
       hash: txHash,
-      status: TransactionStatus.FINALIZED,
+      status: TransactionStatus.ACCEPTED,
+      interval: 3000,
+      retries: 15,
     });
 
     logger.info({ txHash, status: receipt.status }, 'Transaction finalized');
