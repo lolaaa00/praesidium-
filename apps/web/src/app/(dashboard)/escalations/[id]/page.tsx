@@ -4,6 +4,11 @@ import { use, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, AlertTriangle, Shield, Bot } from 'lucide-react';
 import { useEscalation, useResolveEscalation } from '@/hooks/queries/use-escalations';
+import { useWalletAccount } from '@/hooks/use-wallet-account';
+import { useOrgStore } from '@/stores/org-store';
+import { ensureOrgRegisteredOnChain, writeContractAsUser, UndeterminedTransactionError } from '@/lib/genlayer/client';
+import { getErrorMessage } from '@/lib/utils/errors';
+import { TxLifecycle, type TxLifecycleStatus } from '@/components/consensus/tx-lifecycle';
 
 const STATUS_BADGE: Record<string, string> = {
   open: 'bg-warn/15 text-warn',
@@ -26,9 +31,14 @@ export default function EscalationDetailPage({
   const { id } = use(params);
   const { data, isLoading } = useEscalation(id);
   const resolveEscalation = useResolveEscalation();
+  const { address } = useWalletAccount();
+  const { currentOrgName } = useOrgStore();
 
   const [resolutionStatus, setResolutionStatus] = useState<(typeof RESOLUTION_OPTIONS)[number]['value']>('approved');
   const [resolutionNote, setResolutionNote] = useState('');
+  const [chainStatus, setChainStatus] = useState<string | null>(null);
+  const [txStatus, setTxStatus] = useState<TxLifecycleStatus>('idle');
+  const [txHash, setTxHash] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -54,6 +64,38 @@ export default function EscalationDetailPage({
   const validationRequest = esc.validation_request as Record<string, unknown> | null;
   const isOpen = esc.status === 'open';
 
+  // The contract only distinguishes two terminal states (resolved/
+  // dismissed), coarser than Supabase's three (approved/rejected/
+  // policy_updated) — a rejected action maps to 'dismissed', anything
+  // that lets the action proceed maps to 'resolved'. Same mapping used
+  // on the consensus page's inline resolve flow — kept in sync here.
+  async function recordResolutionOnChain() {
+    if (!address) return;
+    try {
+      setChainStatus(null);
+      setTxStatus('awaiting_signature');
+      const onChainStatus = resolutionStatus === 'rejected' ? 'dismissed' : 'resolved';
+      await ensureOrgRegisteredOnChain(address, esc.org_id, currentOrgName ?? esc.org_id);
+      setTxStatus('pending');
+      await writeContractAsUser(
+        address,
+        'resolve_escalation',
+        [`esc-${esc.request_id}`, onChainStatus, resolutionNote.trim()],
+        { onSubmitted: (hash) => { setTxHash(hash); setTxStatus('proposing'); } },
+      );
+      setTxStatus('finalized');
+    } catch (chainErr) {
+      if (chainErr instanceof UndeterminedTransactionError) {
+        setTxHash(chainErr.txHash);
+        setTxStatus('undetermined');
+      } else {
+        console.warn('On-chain escalation resolution failed:', chainErr);
+        setTxStatus('error');
+        setChainStatus(getErrorMessage(chainErr));
+      }
+    }
+  }
+
   async function submitResolution() {
     if (!resolutionNote.trim()) return;
     await resolveEscalation.mutateAsync({
@@ -61,6 +103,13 @@ export default function EscalationDetailPage({
       status: resolutionStatus,
       resolutionNote,
     });
+
+    // Mirror the resolution on-chain, signed by the resolving admin. Best
+    // effort — the Supabase record is the source of truth for the detailed
+    // outcome and is already updated regardless of whether this succeeds.
+    if (address) {
+      await recordResolutionOnChain();
+    }
   }
 
   return (
@@ -87,12 +136,18 @@ export default function EscalationDetailPage({
               {isOpen ? 'Open' : esc.status.replace('_', ' ')}
             </span>
             {esc._onChainVerified ? (
-              <span className="inline-flex rounded-full bg-pass/15 px-2 py-0.5 text-xs font-medium text-pass">
-                Verified on-chain
-              </span>
+              esc.onChainStatusMatches ? (
+                <span className="inline-flex rounded-full bg-pass/15 px-2 py-0.5 text-xs font-medium text-pass">
+                  Matches on-chain ({esc.onChainStatus})
+                </span>
+              ) : (
+                <span className="inline-flex rounded-full bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn">
+                  On-chain: {esc.onChainStatus} (differs)
+                </span>
+              )
             ) : (
-              <span className="inline-flex rounded-full bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn">
-                Cached (on-chain read failed)
+              <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                On-chain read unavailable
               </span>
             )}
           </div>
@@ -147,6 +202,21 @@ export default function EscalationDetailPage({
             </div>
           )}
         </div>
+
+        {chainStatus && (
+          <div className="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{chainStatus}</div>
+        )}
+
+        {txStatus !== 'idle' && (
+          <div className="mt-4">
+            <TxLifecycle
+              status={txStatus}
+              txHash={txHash}
+              errorMessage={chainStatus}
+              onRetry={recordResolutionOnChain}
+            />
+          </div>
+        )}
 
         {isOpen && (
           <div className="mt-6 space-y-2 rounded-lg border bg-muted/40 p-4">

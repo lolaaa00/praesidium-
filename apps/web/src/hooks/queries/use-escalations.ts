@@ -18,6 +18,10 @@ interface EscalationRow {
   resolved_at: string | null;
   /** Merged in on read from the deployed contract — see /api/escalations/[id]. */
   _onChainVerified?: boolean;
+  /** Raw on-chain status ('open' | 'resolved' | 'dismissed') — coarser than `status` above. */
+  onChainStatus?: 'open' | 'resolved' | 'dismissed';
+  /** Whether onChainStatus matches what `status` maps to (rejected -> dismissed, else -> resolved). */
+  onChainStatusMatches?: boolean;
 }
 
 export function useEscalation(id: string) {
