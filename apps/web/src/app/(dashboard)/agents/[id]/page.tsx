@@ -458,7 +458,7 @@ export default function AgentDetailPage({
                           : '—'}
                       </td>
                       <td className="px-6 py-3 text-sm text-muted-foreground">
-                        {new Date(v.created_at as string).toLocaleString()}
+                        {new Date(v.submitted_at as string).toLocaleString()}
                       </td>
                     </tr>
                   );

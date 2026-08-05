@@ -421,7 +421,7 @@ export default function ConsensusPage() {
                   {/* Right: time + link */}
                   <div className="shrink-0 text-right">
                     <p className="text-xs text-muted-foreground">
-                      {new Date(v.created_at as string).toLocaleString()}
+                      {new Date(v.submitted_at as string).toLocaleString()}
                     </p>
                     <Link
                       href={`/validations/${v.id as string}`}

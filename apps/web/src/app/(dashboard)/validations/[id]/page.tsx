@@ -249,7 +249,7 @@ export default function ValidationDetailPage({
             <p className="text-muted-foreground text-sm">—</p>
           )}
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {new Date(v.created_at as string).toLocaleString()}
+            {new Date(v.submitted_at as string).toLocaleString()}
           </p>
         </div>
       </div>

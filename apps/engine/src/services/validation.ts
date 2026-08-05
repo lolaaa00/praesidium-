@@ -1,5 +1,5 @@
 import { getSupabase } from '../lib/supabase.js';
-import { callContract } from '../lib/genlayer.js';
+import { callContract, readContract } from '../lib/genlayer.js';
 import { decryptAgentKey } from '../lib/agent-key.js';
 import { logger } from '../config/logger.js';
 
@@ -125,7 +125,15 @@ export async function runValidation(input: ValidateInput): Promise<ValidationOut
       );
 
       txHash = genlayerResult.txHash;
-      consensusResult = genlayerResult.result;
+
+      // genlayerResult.result is the raw transaction receipt (consensus
+      // metadata, validator votes, etc.) — the actual JSON string
+      // validate_action returns is buried and double-encoded inside
+      // consensus_data.leader_receipt[...], not worth parsing by hand.
+      // The record is already on-chain at this point, so read it straight
+      // back from the contract instead.
+      const onChainRecord = await readContract('get_validation', [requestId]);
+      consensusResult = JSON.parse(onChainRecord as string);
 
       logger.info({ requestId, txHash }, 'GenLayer consensus completed');
     } catch (glError) {
