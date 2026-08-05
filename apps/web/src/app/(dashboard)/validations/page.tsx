@@ -113,7 +113,7 @@ export default function ValidationsPage() {
                         )}
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {new Date(v.created_at as string).toLocaleString()}
+                        {new Date(v.submitted_at as string).toLocaleString()}
                       </p>
                     </div>
                   </div>
